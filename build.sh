@@ -11,7 +11,6 @@ if ! command -v java >/dev/null 2>&1; then
   exit 1
 fi
 
-# Генерируем android/ in-place, если его нет.
 if [[ ! -f android/gradlew ]]; then
   echo "== Создаём android/ in-place через flutter create =="
   rm -rf android
@@ -28,8 +27,6 @@ if [[ ! -f android/gradlew ]]; then
 
   echo "== Патчим compileSdk/ndkVersion для ПЛАГИНОВ (не для :app) =="
   cat > android/compile-sdk-fix.gradle << 'FIXEOF'
-// Форсирует compileSdk 36 и ndkVersion 28 для плагинов Flutter.
-// :app НЕ трогаем — он уже настроен в overlay app/build.gradle.
 subprojects { subproject ->
     if (subproject.name == 'app') return
     subproject.afterEvaluate {
@@ -59,26 +56,32 @@ flutter analyze --no-fatal-infos --no-fatal-warnings || true
 
 printf '\n== Release APK ==\n'
 df -h
-flutter build apk --release || {
-  echo "=== BUILD FAILED — ищем APK ==="
-  find "$PWD" -name "*.apk" -type f 2>/dev/null || true
-  echo "=== android/app/build/outputs ==="
-  find "$PWD/android/app/build/outputs" -type d 2>/dev/null || true
-  echo "=== build/app/outputs ==="
-  find "$PWD/build/app/outputs" -type d 2>/dev/null || true
-  echo "=== disk ==="
+
+# Чистим возможный залипший кэш Flutter-сборки (источник "Already watching path").
+rm -rf .dart_tool/flutter_build 2>/dev/null || true
+
+# flutter build apk иногда возвращает exit 1 из-за бага file-watcher'а
+# ("Already watching path: .../android"), хотя APK успешно собирается.
+# Поэтому || true и проверяем оба возможных пути к APK.
+flutter build apk --release || true
+
+apk_flutter="build/app/outputs/flutter-apk/app-release.apk"
+apk_gradle="android/app/build/outputs/flutter-apk/app-release.apk"
+
+if [[ ! -s "$apk_flutter" ]] && [[ -s "$apk_gradle" ]]; then
+  echo "Flutter не перенёс APK; копируем вручную: $apk_gradle → $apk_flutter"
+  mkdir -p "$(dirname "$apk_flutter")"
+  cp "$apk_gradle" "$apk_flutter"
+fi
+
+echo "=== Все APK в проекте ==="
+find "$PWD" -name "*.apk" -type f 2>/dev/null || true
+
+if [[ ! -s "$apk_flutter" ]]; then
+  echo "Ошибка: APK не найден или пуст: $apk_flutter"
   df -h
   exit 1
-}
-
-echo "=== APK после сборки — где угодно ==="
-find "$PWD" -name "*.apk" -type f 2>/dev/null || true
-ls -la build/app/outputs/flutter-apk/ 2>/dev/null || echo "flutter-apk пуст"
-
-apk="build/app/outputs/flutter-apk/app-release.apk"
-if [[ ! -s "$apk" ]]; then
-  echo "Ошибка: APK не найден или пуст: $apk"
-  exit 1
 fi
-printf '\nГотово: %s\n' "$apk"
-ls -lh "$apk"
+
+printf '\nГотово: %s\n' "$apk_flutter"
+ls -lh "$apk_flutter"
