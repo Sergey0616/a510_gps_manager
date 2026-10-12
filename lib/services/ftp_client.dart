@@ -131,3 +131,24 @@ class FtpClient {
     _control.destroy();
   }
 }
+
+/// Расширение: корректная загрузка файла с чтением финального 226.
+extension FtpClientRetrieve on FtpClient {
+  Future<void> retrieveFile(String remotePath, File target) async {
+    final data = await openRetrieve(remotePath);
+    final sink = target.openWrite();
+    try {
+      await for (final chunk in data) {
+        sink.add(chunk);
+      }
+      await sink.flush();
+      await sink.close();
+    } finally {
+      data.destroy();
+    }
+    final completion = await readResponse();
+    if (completion.code >= 400) {
+      throw FileSystemException('FTP RETR complete: ${completion.text}');
+    }
+  }
+}

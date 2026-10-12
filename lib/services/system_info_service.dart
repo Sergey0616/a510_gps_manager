@@ -140,6 +140,7 @@ class SystemInfoService {
         chunks.addAll(chunk);
       }
       dataSocket.destroy();
+      await ftp.readResponse();
       return String.fromCharCodes(chunks);
     } catch (e) {
       return 'Недоступно: $e';

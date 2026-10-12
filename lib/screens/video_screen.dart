@@ -67,6 +67,52 @@ class _VideoScreenState extends State<VideoScreen> with SingleTickerProviderStat
     return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} ГБ';
   }
 
+  /// Скачать ОДИН файл и сразу открыть его в плеере.
+  /// Не зависит от _selected и не показывает диалог.
+  Future<void> _downloadOne(VideoFile file) async {
+    if (_downloading) return;
+    if (file.isDownloaded) {
+      if (file.isPhoto) {
+        await OpenPhoto.open(context, file.localPath!);
+      } else {
+        await Navigator.of(context).push(MaterialPageRoute<void>(
+          builder: (_) => VideoPlayerScreen(path: file.localPath!, title: file.name),
+        ));
+      }
+      return;
+    }
+    setState(() {
+      _downloading = true;
+      _error = null;
+      _progress[file.remotePath] = _DownloadProgress(received: 0, total: file.sizeBytes, speed: 0, remaining: null);
+    });
+    try {
+      final local = await _service.download(file, onProgress: (received, total, speed, remaining) {
+        if (mounted) setState(() => _progress[file.remotePath] = _DownloadProgress(received: received, total: total, speed: speed, remaining: remaining));
+      });
+      if (!mounted) return;
+      setState(() {
+        final current = _files[file.category] ?? [];
+        final index = current.indexWhere((item) => item.remotePath == file.remotePath);
+        if (index >= 0) {
+          current[index] = file.copyWith(localPath: local.path);
+        }
+        _progress.remove(file.remotePath);
+      });
+      if (file.isPhoto) {
+        await OpenPhoto.open(context, local.path);
+      } else {
+        await Navigator.of(context).push(MaterialPageRoute<void>(
+          builder: (_) => VideoPlayerScreen(path: local.path, title: file.name),
+        ));
+      }
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка скачивания: $error')));
+    } finally {
+      if (mounted) setState(() => _downloading = false);
+    }
+  }
+
   Future<void> _downloadSelected() async {
     final selected = _currentFiles.where((f) => _selected.contains(f.remotePath) && !f.isDownloaded).toList();
     if (selected.isEmpty) {
@@ -150,10 +196,11 @@ class _VideoScreenState extends State<VideoScreen> with SingleTickerProviderStat
                         Text('${progress.total > 0 ? (progress.received * 100 / progress.total).toStringAsFixed(1) : '…'}% · ${_formatBytes(progress.received)} · ${_formatBytes(progress.speed.round())}/с · ${progress.remaining == null ? 'осталось —' : 'осталось ${progress.remaining!.inMinutes} мин ${progress.remaining!.inSeconds % 60} с'}'),
                       ],
                     ]),
-                    trailing: Wrap(spacing: 0, children: [
-                      if (file.isDownloaded) IconButton(tooltip: 'Играть', onPressed: file.isPhoto ? () => OpenPhoto.open(context, file.localPath!) : () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => VideoPlayerScreen(path: file.localPath!, title: file.name))), icon: Icon(file.isPhoto ? Icons.photo : Icons.play_circle)),
-                      IconButton(tooltip: file.isDownloaded ? 'Уже скачан' : 'Скачать', onPressed: _downloading || file.isDownloaded ? null : () { setState(() => _selected.add(file.remotePath)); _downloadSelected(); }, icon: const Icon(Icons.download)),
-                    ]),
+                    trailing: IconButton(
+                      tooltip: file.isDownloaded ? 'Воспроизвести' : 'Скачать и воспроизвести',
+                      onPressed: _downloading ? null : () => _downloadOne(file),
+                      icon: Icon(file.isDownloaded ? (file.isPhoto ? Icons.photo : Icons.play_circle) : Icons.download),
+                    ),
                   );
                 })),
         ]),
