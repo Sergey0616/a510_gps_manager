@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
+import 'package:flutter/foundation.dart';
 import 'package:xml/xml.dart';
 
 import '../models/gps_point.dart';
@@ -72,43 +73,70 @@ class StorageService {
         .where((entity) => entity is File && entity.path.toLowerCase().endsWith('.gpx'))
         .cast<File>()
         .toList();
+    debugPrint('[GPS] loadTracks: dir=${parsedDirectory.path} files=${files.length}');
     final tracks = <Track>[];
-
-    // Хелпер: первый дочерний элемент по локальному имени (без учёта namespace).
-    XmlElement? childByLocal(XmlElement parent, String local) {
-      for (final child in parent.childElements) {
-        if (child.name.local == local) return child;
-      }
-      return null;
-    }
 
     for (final file in files) {
       try {
-        final xml = XmlDocument.parse(await file.readAsString());
+        final content = await file.readAsString();
+        debugPrint('[GPS] ${file.path.split('/').last}: size=${content.length}');
 
-        // Ищем все trkpt БЕЗ учёта namespace (GPX 1.1 использует default namespace).
-        final trkpts = xml.descendants
+        final XmlDocument xml;
+        try {
+          xml = XmlDocument.parse(content);
+        } catch (e) {
+          debugPrint('[GPS] XML parse error: $e');
+          continue;
+        }
+
+        // Пробуем несколько стратегий поиска trkpt
+        List<XmlElement> trkpts = xml
+            .descendants
             .whereType<XmlElement>()
             .where((e) => e.name.local == 'trkpt')
             .toList();
+
+        debugPrint('[GPS] strategy1 (descendants/local): ${trkpts.length}');
+
+        if (trkpts.isEmpty) {
+          trkpts = xml.findAllElements('trkpt', namespace: '*').toList();
+          debugPrint('[GPS] strategy2 (findAllElements ns=*): ${trkpts.length}');
+        }
+        if (trkpts.isEmpty) {
+          trkpts = xml.descendants.whereType<XmlElement>().where((e) => e.name.toString().contains('trkpt')).toList();
+          debugPrint('[GPS] strategy3 (name contains): ${trkpts.length}');
+        }
 
         final points = <GpsPoint>[];
         for (final element in trkpts) {
           final lat = double.tryParse(element.getAttribute('lat') ?? '');
           final lon = double.tryParse(element.getAttribute('lon') ?? '');
-          final timeEl = childByLocal(element, 'time');
-          final timeText = timeEl?.innerText;
-          if (lat == null || lon == null || timeText == null) continue;
+          if (lat == null || lon == null) continue;
+
+          String? timeText;
+          for (final child in element.childElements) {
+            if (child.name.local == 'time') {
+              timeText = child.innerText.trim();
+              break;
+            }
+          }
+          if (timeText == null) continue;
+
           final time = DateTime.tryParse(timeText);
           if (time == null) continue;
 
-          var speedText = '0';
-          final extEl = childByLocal(element, 'extensions');
-          if (extEl != null) {
-            final speedEl = childByLocal(extEl, 'speed');
-            if (speedEl != null) speedText = speedEl.innerText;
+          var speedMps = 0.0;
+          for (final child in element.childElements) {
+            if (child.name.local == 'extensions') {
+              for (final ext in child.childElements) {
+                if (ext.name.local == 'speed') {
+                  speedMps = double.tryParse(ext.innerText.trim()) ?? 0.0;
+                  break;
+                }
+              }
+            }
           }
-          final speedMps = double.tryParse(speedText) ?? 0;
+
           if (!lat.isFinite || !lon.isFinite || lat < -90 || lat > 90 || lon < -180 || lon > 180) continue;
           points.add(GpsPoint(
             timestamp: time.toUtc().millisecondsSinceEpoch ~/ 1000,
@@ -117,20 +145,23 @@ class StorageService {
             speedKmh: speedMps * 3.6,
           ));
         }
+        debugPrint('[GPS] points parsed: ${points.length}');
+
         if (points.isNotEmpty) {
           points.sort((a, b) => a.timestamp.compareTo(b.timestamp));
           tracks.add(Track(
-            id: _basename(file.path).replaceFirst(RegExp(r'\.gpx$', caseSensitive: false), '').replaceFirst('track_', ''),
+            id: file.path.split('/').last.replaceFirst(RegExp(r'\.gpx$', caseSensitive: false), '').replaceFirst('track_', ''),
             points: points,
             gpxPath: file.path,
           ));
+          debugPrint('[GPS] track added, total tracks=${tracks.length}');
         }
-      } on FormatException {
-        continue;
-      } on FileSystemException {
+      } catch (e, st) {
+        debugPrint('[GPS] file error: $e\n$st');
         continue;
       }
     }
+    debugPrint('[GPS] loadTracks done: ${tracks.length} tracks');
     tracks.sort((a, b) => b.startUtc.compareTo(a.startUtc));
     return tracks;
   }
