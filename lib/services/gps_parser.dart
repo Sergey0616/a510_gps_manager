@@ -45,6 +45,10 @@ class GpsParser {
     return _buildTracks(points);
   }
 
+  /// Публичный метод: собрать треки из готового списка точек.
+  /// Используется после merge из двух источников.
+  List<Track> buildTracksFromPoints(List<GpsPoint> points) => _buildTracks(points);
+
   /// Собирает точки в треки, объединяет близкие по времени и сортирует.
   List<Track> _buildTracks(List<GpsPoint> points) {
     points.sort((a, b) => a.timestamp.compareTo(b.timestamp));

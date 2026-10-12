@@ -20,11 +20,12 @@ class VideoService {
   IOSink? _activeSink;
   bool _cancelRequested = false;
 
+  // Все категории на регистраторе имеют подпапки Front/Back.
   static const Map<VideoCategory, List<String>> _directories = {
     VideoCategory.normal: ['/mnt/sd/Normal/Front', '/mnt/sd/Normal/Rear'],
-    VideoCategory.parking: ['/mnt/sd/Parking'],
-    VideoCategory.event: ['/mnt/sd/Event'],
-    VideoCategory.photo: ['/mnt/sd/Photo'],
+    VideoCategory.parking: ['/mnt/sd/Parking/Front', '/mnt/sd/Parking/Back'],
+    VideoCategory.event: ['/mnt/sd/Event/Front', '/mnt/sd/Event/Back'],
+    VideoCategory.photo: ['/mnt/sd/Photo/Front', '/mnt/sd/Photo/Back'],
   };
 
   Future<List<VideoFile>> scan(VideoCategory category, {String? localRoot}) async {

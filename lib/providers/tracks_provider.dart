@@ -155,11 +155,28 @@ class TracksProvider extends ChangeNotifier {
         freshTracks = await parser.parseFiles(freshFiles);
       }
 
-      // === 3. Объединяем ===
-      final allTracks = <Track>[];
-      allTracks.addAll(gpsDataTracks);
-      allTracks.addAll(freshTracks);
-      print('[Sync] GPSData: ${gpsDataTracks.length}, fresh: ${freshTracks.length}, total: ${allTracks.length}');
+      // === 3. Объединяем с приоритетом GPSData (там есть videoName) ===
+      // Собираем все точки из двух источников, удаляем дубликаты по timestamp.
+      // При коллизии предпочитаем точку с videoName.
+      final merged = <int, GpsPoint>{};
+      for (final track in freshTracks) {
+        for (final p in track.points) {
+          merged[p.timestamp] = p;
+        }
+      }
+      // GPSData перезаписывает — у неё приоритет.
+      for (final track in gpsDataTracks) {
+        for (final p in track.points) {
+          merged[p.timestamp] = p;
+        }
+      }
+      print('[Sync] GPSData: ${gpsDataTracks.length}, fresh: ${freshTracks.length}, merged points: ${merged.length}');
+
+      // Пересобираем треки из объединённых точек.
+      final mergedPoints = merged.values.toList()
+        ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+      final allTracks = parser.buildTracksFromPoints(mergedPoints);
+      print('[Sync] total tracks: ${allTracks.length}');
 
       if (allTracks.isEmpty) {
         throw StateError('Не удалось получить ни одного трека');

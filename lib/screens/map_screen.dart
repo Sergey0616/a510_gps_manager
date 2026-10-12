@@ -50,9 +50,13 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   /// Long-press по карте → ближайшая точка маршрута → bottom sheet.
+  /// Приоритет — точки с videoName (можно открыть видео).
   Future<void> _handleLongPress(LatLng tapPoint, List<Track> tracks) async {
     GpsPoint? nearest;
+    GpsPoint? nearestWithVideo;
     double bestDist = double.infinity;
+    double bestVideoDist = double.infinity;
+
     for (final track in tracks) {
       for (final p in track.points) {
         final d = _distanceMeters(tapPoint, p.position);
@@ -60,9 +64,21 @@ class _MapScreenState extends State<MapScreen> {
           bestDist = d;
           nearest = p;
         }
+        if (p.videoName != null && p.videoName!.isNotEmpty && d < bestVideoDist) {
+          bestVideoDist = d;
+          nearestWithVideo = p;
+        }
       }
     }
-    if (nearest == null || bestDist > 300) {
+
+    GpsPoint? chosen;
+    if (nearestWithVideo != null && bestVideoDist <= 500) {
+      chosen = nearestWithVideo;
+    } else if (nearest != null && bestDist <= 300) {
+      chosen = nearest;
+    }
+
+    if (chosen == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text('Рядом нет точек маршрута. Приблизьте карту и нажмите ещё раз.'),
@@ -71,7 +87,7 @@ class _MapScreenState extends State<MapScreen> {
       return;
     }
     if (!mounted) return;
-    final point = nearest;
+    final point = chosen;
     await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
