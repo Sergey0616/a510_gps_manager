@@ -174,7 +174,7 @@ class _FtpSession {
 
   static Future<_FtpSession> connect(String host, int port, String username, String password) async {
     final socket = await Socket.connect(host, port, timeout: const Duration(seconds: 12));
-    final session = _FtpSession(socket, StreamIterator<String>(socket.transform(utf8.decoder).transform(const LineSplitter())));
+    final session = _FtpSession(socket, StreamIterator<String>(socket.cast<List<int>>().transform(utf8.decoder).transform(const LineSplitter())));
     final greeting = await session.readResponse();
     if (greeting.code >= 400) throw SocketException('FTP greeting: ${greeting.text}');
     final user = await session.command('USER $username');
@@ -205,7 +205,7 @@ class _FtpSession {
     }
     if (line == null) throw const SocketException('FTP-соединение прервано');
     final match = RegExp(r'^(\d{3})([ -])(.*)$').firstMatch(line);
-    if (match == null) return const _FtpResponse(0, line);
+    if (match == null) return _FtpResponse(0, line);
     final code = int.parse(match.group(1)!);
     final lines = <String>[line];
     if (match.group(2) == '-') {
@@ -238,7 +238,7 @@ class _FtpSession {
     final initial = await readResponse();
     if (initial.code >= 400) { data.destroy(); throw FileSystemException('FTP LIST: ${initial.text}'); }
     // Прочитываем данные каталога и закрываем data socket перед финальным ответом.
-    final lines = await data.transform(utf8.decoder).transform(const LineSplitter()).toList();
+    final lines = await data.cast<List<int>>().transform(utf8.decoder).transform(const LineSplitter()).toList();
     data.destroy();
     final completion = await readResponse();
     if (completion.code >= 400) throw FileSystemException('FTP LIST: ${completion.text}');

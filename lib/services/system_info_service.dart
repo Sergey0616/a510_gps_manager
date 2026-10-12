@@ -23,10 +23,10 @@ class SystemInfo {
 
   String configValue(String key) {
     for (final line in config.split(RegExp(r'\r?\n'))) {
-      final match = RegExp('^\\s*${RegExp.escape(key)}\\s*=\\s*(.*)$').firstMatch(line);
+      final match = RegExp('^\\s*${RegExp.escape(key)}\\s*=\\s*(.*)\$').firstMatch(line);
       if (match == null) continue;
       var value = match.group(1)!.trim();
-      if (value.length >= 2 && ((value.startsWith('\"') && value.endsWith('\"')) || (value.startsWith("'") && value.endsWith("'")))) {
+      if (value.length >= 2 && ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'")))) {
         value = value.substring(1, value.length - 1);
       }
       return value.isEmpty ? 'N/A' : value;
