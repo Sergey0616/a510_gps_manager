@@ -259,7 +259,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           builder: (context, snapshot) {
             final custom = snapshot.data;
             return FutureBuilder<String>(
-              future: custom ?? StoragePaths.defaultPath(),
+              future: custom != null ? Future.value(custom) : StoragePaths.defaultPath(),
               builder: (context, pathSnap) {
                 final currentPath = pathSnap.data ?? '…';
                 return Column(
