@@ -59,7 +59,7 @@ flutter analyze --no-fatal-infos --no-fatal-warnings || true
 
 printf '\n== Release APK ==\n'
 df -h
-flutter build apk --release --stacktrace || {
+flutter build apk --release || {
   echo "=== BUILD FAILED — ищем APK ==="
   find "$PWD" -name "*.apk" -type f 2>/dev/null || true
   echo "=== android/app/build/outputs ==="
