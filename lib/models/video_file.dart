@@ -47,6 +47,35 @@ class VideoFile {
         localPath: localPath ?? this.localPath,
       );
 
+  /// Создаёт VideoFile по имени файла (без FTP-листинга).
+  /// Используется при переходе из точки трека на карте.
+  static VideoFile fromName(String name, {VideoCategory category = VideoCategory.normal}) {
+    String dir;
+    switch (category) {
+      case VideoCategory.normal:
+        dir = name.toUpperCase().endsWith('R.MP4')
+            ? '/mnt/sd/Normal/Rear'
+            : '/mnt/sd/Normal/Front';
+        break;
+      case VideoCategory.parking:
+        dir = '/mnt/sd/Parking';
+        break;
+      case VideoCategory.event:
+        dir = '/mnt/sd/Event';
+        break;
+      case VideoCategory.photo:
+        dir = '/mnt/sd/Photo';
+        break;
+    }
+    return VideoFile(
+      name: name,
+      remotePath: '$dir/$name',
+      category: category,
+      sizeBytes: 0,
+      recordedAt: parseDateFromName(name),
+    );
+  }
+
   static DateTime? parseDateFromName(String name) {
     // Ожидаемый шаблон: NOYYYYMMDD-HHMMSS-NNNNNNF.MP4 / ...R.MP4.
     final match = RegExp(r'NO(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})-', caseSensitive: false).firstMatch(name);

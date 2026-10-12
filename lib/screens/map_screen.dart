@@ -1,10 +1,17 @@
+import 'dart:io';
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../models/gps_point.dart';
 import '../models/track.dart';
+import '../models/video_file.dart';
 import '../providers/tracks_provider.dart';
+import '../services/video_service.dart';
+import 'video_player_screen.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key, this.initialTrackId});
@@ -34,6 +41,130 @@ class _MapScreenState extends State<MapScreen> {
     showModalBottomSheet<void>(context: context, showDragHandle: true, builder: (_) => _TrackDetails(track: track));
   }
 
+  /// Расстояние между точками в метрах (упрощённая формула).
+  double _distanceMeters(LatLng a, LatLng b) {
+    final dlat = (a.latitude - b.latitude) * 111320.0;
+    final dlon = (a.longitude - b.longitude) * 111320.0 * math.cos(a.latitude * math.pi / 180.0);
+    return math.sqrt(dlat * dlat + dlon * dlon);
+  }
+
+  /// Long-press по карте → ближайшая точка маршрута → bottom sheet.
+  Future<void> _handleLongPress(LatLng tapPoint, List<Track> tracks) async {
+    GpsPoint? nearest;
+    double bestDist = double.infinity;
+    for (final track in tracks) {
+      for (final p in track.points) {
+        final d = _distanceMeters(tapPoint, p.position);
+        if (d < bestDist) {
+          bestDist = d;
+          nearest = p;
+        }
+      }
+    }
+    if (nearest == null || bestDist > 300) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Рядом нет точек маршрута. Приблизьте карту и нажмите ещё раз.'),
+        ));
+      }
+      return;
+    }
+    if (!mounted) return;
+    final point = nearest;
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (_) => _PointDetails(point: point, onOpenVideo: () => _openVideoAt(point)),
+    );
+  }
+
+  /// Открывает видео с точки: проверяет, скачано ли, и передаёт startPosition.
+  Future<void> _openVideoAt(GpsPoint point) async {
+    final name = point.videoName;
+    if (name == null || name.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Для этой точки нет привязки к видео'),
+        ));
+      }
+      return;
+    }
+    final videoStart = VideoFile.parseDateFromName(name);
+    if (videoStart == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Не удалось определить время начала видео из имени'),
+        ));
+      }
+      return;
+    }
+    final videoStartUtc = videoStart.toUtc().millisecondsSinceEpoch ~/ 1000;
+    final offsetSec = (point.timestamp - videoStartUtc).clamp(0, 3600);
+
+    final provider = context.read<TracksProvider>();
+    final videoService = VideoService(host: provider.host, username: provider.username, password: provider.password);
+    final root = await videoService.videoRootPath();
+    final video = VideoFile.fromName(name);
+    final localFile = File('$root/${video.category.folderName}/$name');
+
+    if (!await localFile.exists()) {
+      if (!mounted) return;
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Видео не скачано'),
+          content: Text('Файл $name отсутствует локально.\n\nСкачать его с регистратора (~100–200 МБ)?'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Отмена')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Скачать')),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
+      if (!mounted) return;
+      final progress = ValueNotifier<double>(0);
+      showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => AlertDialog(
+          title: Text('Скачивание $name'),
+          content: ValueListenableBuilder<double>(
+            valueListenable: progress,
+            builder: (_, v, __) => Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                LinearProgressIndicator(value: v > 0 ? v : null),
+                const SizedBox(height: 8),
+                Text('${(v * 100).toStringAsFixed(0)} %'),
+              ],
+            ),
+          ),
+        ),
+      );
+      try {
+        await videoService.download(video, onProgress: (received, total, speed, remaining) {
+          if (total > 0) progress.value = received / total;
+        });
+      } catch (e) {
+        if (mounted) {
+          Navigator.of(context).pop();
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка скачивания: $e')));
+        }
+        return;
+      }
+      if (mounted) Navigator.of(context).pop();
+    }
+
+    if (!mounted) return;
+    await Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => VideoPlayerScreen(
+        path: localFile.path,
+        title: name,
+        startPosition: Duration(seconds: offsetSec),
+      ),
+    ));
+  }
+
   @override
   Widget build(BuildContext context) => Consumer<TracksProvider>(
         builder: (context, provider, _) {
@@ -58,11 +189,21 @@ class _MapScreenState extends State<MapScreen> {
             markers.add(Marker(point: positions.last, width: 36, height: 36, child: GestureDetector(onTap: () => _showTrack(track), child: const Icon(Icons.location_on, color: Colors.red, size: 30))));
           }
           return Scaffold(
-            appBar: AppBar(title: const Text('Карта треков'), actions: [IconButton(tooltip: 'Центрировать маршруты', icon: const Icon(Icons.center_focus_strong), onPressed: () => _fitAll(tracks))]),
+            appBar: AppBar(
+              title: const Text('Карта треков'),
+              actions: [
+                IconButton(tooltip: 'Центрировать маршруты', icon: const Icon(Icons.center_focus_strong), onPressed: () => _fitAll(tracks)),
+              ],
+            ),
             body: Stack(children: [
               FlutterMap(
                 mapController: _mapController,
-                options: MapOptions(initialCenter: startTrack.points.first.position, initialZoom: 13, onTap: (_, __) => setState(() => _selectedTrack = null)),
+                options: MapOptions(
+                  initialCenter: startTrack.points.first.position,
+                  initialZoom: 13,
+                  onTap: (_, __) => setState(() => _selectedTrack = null),
+                  onLongPress: (_, tapPoint) => _handleLongPress(tapPoint, tracks),
+                ),
                 children: [
                   TileLayer(urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', userAgentPackageName: 'ru.a510.gpsmanager'),
                   PolylineLayer(polylines: polylines),
@@ -75,6 +216,17 @@ class _MapScreenState extends State<MapScreen> {
                 const SizedBox(height: 8),
                 FloatingActionButton.small(heroTag: 'zoom_out', tooltip: 'Отдалить', onPressed: () { final camera = _mapController.camera; _mapController.move(camera.center, camera.zoom - 1); }, child: const Icon(Icons.remove)),
               ])),
+              Positioned(left: 12, right: 76, top: 12, child: Card(
+                color: Colors.black87,
+                child: Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: Text(
+                    'Долгое нажатие на маршрут → открыть видео с этой точки',
+                    style: TextStyle(color: Colors.white70, fontSize: 12),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              )),
               if (_selectedTrack != null) Positioned(left: 12, right: 76, bottom: 20, child: Card(child: ListTile(
                 title: Text(DateFormat('dd.MM.yyyy HH:mm').format(_selectedTrack!.startLocal)),
                 subtitle: Text('${_selectedTrack!.distanceKm.toStringAsFixed(2)} км · макс. ${_selectedTrack!.maxSpeedKmh.toStringAsFixed(0)} км/ч'),
@@ -109,6 +261,44 @@ class _TrackDetails extends StatelessWidget {
           Text('Длительность: ${_duration(track.duration)}'),
           Text('Максимальная скорость: ${track.maxSpeedKmh.toStringAsFixed(1)} км/ч'),
           Text('Точек: ${track.points.length}'),
+          if (track.videoNames.isNotEmpty)
+            Text('Видео: ${track.videoNames.length} файлов'),
         ]),
       ));
+}
+
+class _PointDetails extends StatelessWidget {
+  const _PointDetails({required this.point, required this.onOpenVideo});
+  final GpsPoint point;
+  final VoidCallback onOpenVideo;
+
+  @override
+  Widget build(BuildContext context) {
+    final time = DateFormat('dd.MM.yyyy HH:mm:ss').format(point.timeUtc.toLocal());
+    return SafeArea(child: Padding(
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+      child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('Точка маршрута', style: Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height: 12),
+        Text('Время: $time'),
+        Text('Скорость: ${point.speedKmh.toStringAsFixed(1)} км/ч'),
+        if (point.course != null) Text('Курс: ${point.course}°'),
+        if (point.tilt != null) Text('Наклон: ${point.tilt}°'),
+        Text('Координаты: ${point.latitude.toStringAsFixed(5)}, ${point.longitude.toStringAsFixed(5)}'),
+        if (point.videoName != null) Text('Видео: ${point.videoName}'),
+        const SizedBox(height: 16),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            onPressed: point.videoName == null ? null : () {
+              Navigator.of(context).pop();
+              onOpenVideo();
+            },
+            icon: const Icon(Icons.play_circle),
+            label: const Text('Открыть видео с этого момента'),
+          ),
+        ),
+      ]),
+    ));
+  }
 }
