@@ -133,20 +133,24 @@ class StorageService {
           if (time == null) continue;
 
           var speedMps = 0.0;
+          String? videoName;
+          int? course;
           // speed может быть прямо в trkpt (новый формат) или внутри extensions (старый).
+          // Также извлекаем videoName и course из extensions.
           for (final child in element.childElements) {
             if (child.name.local == 'speed') {
               speedMps = double.tryParse(child.innerText.trim()) ?? 0.0;
-              break;
-            }
-            if (child.name.local == 'extensions') {
+            } else if (child.name.local == 'extensions') {
               for (final ext in child.childElements) {
                 if (ext.name.local == 'speed') {
                   speedMps = double.tryParse(ext.innerText.trim()) ?? 0.0;
-                  break;
+                } else if (ext.name.local == 'video') {
+                  final v = ext.innerText.trim();
+                  if (v.isNotEmpty) videoName = v;
+                } else if (ext.name.local == 'course') {
+                  course = int.tryParse(ext.innerText.trim());
                 }
               }
-              if (speedMps > 0) break;
             }
           }
 
@@ -156,6 +160,8 @@ class StorageService {
             latitude: lat,
             longitude: lon,
             speedKmh: speedMps * 3.6,
+            videoName: videoName,
+            course: course,
           ));
         }
         debug += '; pts=${points.length}';

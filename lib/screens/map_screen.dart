@@ -72,7 +72,7 @@ class _MapScreenState extends State<MapScreen> {
     }
 
     GpsPoint? chosen;
-    if (nearestWithVideo != null && bestVideoDist <= 500) {
+    if (nearestWithVideo != null && bestVideoDist <= 1500) {
       chosen = nearestWithVideo;
     } else if (nearest != null && bestDist <= 300) {
       chosen = nearest;

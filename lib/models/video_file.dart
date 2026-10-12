@@ -1,12 +1,13 @@
 import 'dart:io';
 
-enum VideoCategory { normal, parking, event, photo }
+enum VideoCategory { normal, parking, event, lapse, photo }
 
 extension VideoCategoryLabel on VideoCategory {
   String get label => switch (this) {
         VideoCategory.normal => 'Normal',
         VideoCategory.parking => 'Parking',
         VideoCategory.event => 'Event',
+        VideoCategory.lapse => 'Lapse',
         VideoCategory.photo => 'Photo',
       };
 
@@ -14,6 +15,7 @@ extension VideoCategoryLabel on VideoCategory {
         VideoCategory.normal => 'Normal',
         VideoCategory.parking => 'Parking',
         VideoCategory.event => 'Event',
+        VideoCategory.lapse => 'Lapse',
         VideoCategory.photo => 'Photo',
       };
 }

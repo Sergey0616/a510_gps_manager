@@ -16,6 +16,19 @@ class GpxWriter {
       b.writeln('      <trkpt lat="${p.latitude.toStringAsFixed(7)}" lon="${p.longitude.toStringAsFixed(7)}">');
       b.writeln('        <time>${p.timeUtc.toIso8601String()}</time>');
       b.writeln('        <speed>${p.speedMps.toStringAsFixed(3)}</speed>');
+      // Сохраняем имя MP4 и курс — нужны для открытия видео с точки на карте.
+      final videoName = p.videoName;
+      final course = p.course;
+      if ((videoName != null && videoName.isNotEmpty) || course != null) {
+        b.writeln('        <extensions>');
+        if (videoName != null && videoName.isNotEmpty) {
+          b.writeln('          <video>$videoName</video>');
+        }
+        if (course != null) {
+          b.writeln('          <course>$course</course>');
+        }
+        b.writeln('        </extensions>');
+      }
       b.writeln('      </trkpt>');
     }
     b.writeln('    </trkseg>');
