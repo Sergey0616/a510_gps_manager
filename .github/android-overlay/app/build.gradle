@@ -13,7 +13,8 @@ android {
         applicationId "ru.a510.gpsmanager"
         minSdk 24
         targetSdk 34
-        // versionCode/versionName берутся из pubspec.yaml
+        versionCode 4
+        versionName "1.1.0"
     }
 
     compileOptions {
