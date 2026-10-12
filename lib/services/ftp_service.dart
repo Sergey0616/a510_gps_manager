@@ -61,7 +61,9 @@ class FtpService {
           if (await temp.exists()) await temp.delete();
           final dataSocket = await ftp.openRetrieve(entry.name);
           final sink = temp.openWrite();
-          await dataSocket.pipe(sink);
+          await for (final chunk in dataSocket) {
+            sink.add(chunk);
+          }
           await sink.flush();
           await sink.close();
           dataSocket.destroy();
