@@ -28,12 +28,14 @@ if [[ ! -f android/gradlew ]]; then
   # Форсируем compileSdk 36 для всех подпроектов (file_picker требует 36).
   echo "Патчим compileSdk 36 для всех подпроектов…"
   cat > android/compile-sdk-fix.gradle << 'FIXEOF'
-// Форсирует compileSdk 36 для всех плагинов Flutter (file_picker требует 36).
+// Форсирует compileSdk 36 и ndkVersion 28 для всех плагинов Flutter
+// (file_picker, media_kit и другие требуют эти версии).
 subprojects { subproject ->
     subproject.afterEvaluate {
         if (subproject.hasProperty('android')) {
             subproject.android {
                 compileSdkVersion 36
+                ndkVersion "28.2.13676358"
             }
         }
     }
@@ -41,6 +43,12 @@ subprojects { subproject ->
 FIXEOF
   echo "" >> android/build.gradle
   echo "apply from: 'compile-sdk-fix.gradle'" >> android/build.gradle
+
+  # Удаляем build.gradle.kts — иначе конфликтует с build.gradle
+  rm -f android/build.gradle.kts android/app/build.gradle.kts
+
+  # Обновляем NDK на 28.2.13676358 (требование file_picker / media_kit)
+  sed -i 's/ndkVersion "[0-9.]*"/ndkVersion "28.2.13676358"/' android/app/build.gradle
 fi
 
 printf '\n== Flutter environment ==\n'
