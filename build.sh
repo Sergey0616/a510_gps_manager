@@ -3,38 +3,39 @@ set -Eeuo pipefail
 cd "$(dirname "$0")"
 
 if ! command -v flutter >/dev/null 2>&1; then
-  echo "Ошибка: Flutter SDK не найден в PATH. Установите Flutter 3.24+ и повторите запуск."
+  echo "Ошибка: Flutter SDK не найден в PATH."
   exit 1
 fi
 if ! command -v java >/dev/null 2>&1; then
-  echo "Ошибка: Java не найдена. Для актуальной сборки Flutter Android требуется JDK, совместимый с используемым Gradle (обычно JDK 17)."
+  echo "Ошибка: Java не найдена."
   exit 1
 fi
 
-# Если Android-обвязки нет, генерируем её через установленный Flutter SDK.
+# Генерируем android/ in-place, если его нет.
 if [[ ! -f android/gradlew ]]; then
-  echo "Android Gradle Wrapper не найден; создаём стандартный каркас Flutter…"
-  temp_dir="$(mktemp -d)"
-  trap 'rm -rf "$temp_dir"' EXIT
-  flutter create --platforms=android --org ru.a510 --project-name a510_gps_manager "$temp_dir/scaffold"
+  echo "== Создаём android/ in-place через flutter create =="
   rm -rf android
-  cp -a "$temp_dir/scaffold/android" ./android
+  flutter create --platforms=android --org ru.a510 --project-name a510_gps_manager .
+
+  echo "== Копируем overlay =="
   cp .github/android-overlay/app/build.gradle android/app/build.gradle
   cp .github/android-overlay/app/src/main/AndroidManifest.xml android/app/src/main/AndroidManifest.xml
+
   rm -rf android/app/src/main/kotlin
   mkdir -p android/app/src/main/kotlin/ru/a510/gpsmanager
-  cp .github/android-overlay/app/src/main/kotlin/ru/a510/gpsmanager/MainActivity.kt android/app/src/main/kotlin/ru/a510/gpsmanager/MainActivity.kt
+  cp .github/android-overlay/app/src/main/kotlin/ru/a510/gpsmanager/MainActivity.kt \
+     android/app/src/main/kotlin/ru/a510/gpsmanager/MainActivity.kt
 
-  # Форсируем compileSdk 36 для всех подпроектов (file_picker требует 36).
-  echo "Патчим compileSdk 36 для всех подпроектов…"
+  echo "== Патчим compileSdk/ndkVersion для ПЛАГИНОВ (не для :app) =="
   cat > android/compile-sdk-fix.gradle << 'FIXEOF'
-// Форсирует compileSdk 36 и ndkVersion 28 для всех плагинов Flutter
-// (file_picker, media_kit и другие требуют эти версии).
+// Форсирует compileSdk 36 и ndkVersion 28 для плагинов Flutter.
+// :app НЕ трогаем — он уже настроен в overlay app/build.gradle.
 subprojects { subproject ->
+    if (subproject.name == 'app') return
     subproject.afterEvaluate {
         if (subproject.hasProperty('android')) {
             subproject.android {
-                compileSdkVersion 36
+                compileSdk 36
                 ndkVersion "28.2.13676358"
             }
         }
@@ -44,11 +45,7 @@ FIXEOF
   echo "" >> android/build.gradle
   echo "apply from: 'compile-sdk-fix.gradle'" >> android/build.gradle
 
-  # Удаляем build.gradle.kts — иначе конфликтует с build.gradle
   rm -f android/build.gradle.kts android/app/build.gradle.kts
-
-  # Обновляем NDK на 28.2.13676358 (требование file_picker / media_kit)
-  sed -i 's/ndkVersion "[0-9.]*"/ndkVersion "28.2.13676358"/' android/app/build.gradle
 fi
 
 printf '\n== Flutter environment ==\n'
@@ -59,8 +56,24 @@ printf '\n== Resolve dependencies ==\n'
 flutter pub get
 printf '\n== Static analysis ==\n'
 flutter analyze --no-fatal-infos --no-fatal-warnings || true
+
 printf '\n== Release APK ==\n'
-flutter build apk --release
+df -h
+flutter build apk --release --stacktrace || {
+  echo "=== BUILD FAILED — ищем APK ==="
+  find "$PWD" -name "*.apk" -type f 2>/dev/null || true
+  echo "=== android/app/build/outputs ==="
+  find "$PWD/android/app/build/outputs" -type d 2>/dev/null || true
+  echo "=== build/app/outputs ==="
+  find "$PWD/build/app/outputs" -type d 2>/dev/null || true
+  echo "=== disk ==="
+  df -h
+  exit 1
+}
+
+echo "=== APK после сборки — где угодно ==="
+find "$PWD" -name "*.apk" -type f 2>/dev/null || true
+ls -la build/app/outputs/flutter-apk/ 2>/dev/null || echo "flutter-apk пуст"
 
 apk="build/app/outputs/flutter-apk/app-release.apk"
 if [[ ! -s "$apk" ]]; then
