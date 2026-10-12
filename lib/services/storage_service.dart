@@ -133,7 +133,12 @@ class StorageService {
           if (time == null) continue;
 
           var speedMps = 0.0;
+          // speed может быть прямо в trkpt (новый формат) или внутри extensions (старый).
           for (final child in element.childElements) {
+            if (child.name.local == 'speed') {
+              speedMps = double.tryParse(child.innerText.trim()) ?? 0.0;
+              break;
+            }
             if (child.name.local == 'extensions') {
               for (final ext in child.childElements) {
                 if (ext.name.local == 'speed') {
@@ -141,6 +146,7 @@ class StorageService {
                   break;
                 }
               }
+              if (speedMps > 0) break;
             }
           }
 
