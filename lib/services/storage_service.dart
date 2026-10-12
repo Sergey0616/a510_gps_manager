@@ -74,25 +74,39 @@ class StorageService {
         .toList();
     final tracks = <Track>[];
 
+    // Хелпер: первый дочерний элемент по локальному имени (без учёта namespace).
+    XmlElement? childByLocal(XmlElement parent, String local) {
+      for (final child in parent.childElements) {
+        if (child.name.local == local) return child;
+      }
+      return null;
+    }
+
     for (final file in files) {
       try {
         final xml = XmlDocument.parse(await file.readAsString());
+
+        // Ищем все trkpt БЕЗ учёта namespace (GPX 1.1 использует default namespace).
+        final trkpts = xml.descendants
+            .whereType<XmlElement>()
+            .where((e) => e.name.local == 'trkpt')
+            .toList();
+
         final points = <GpsPoint>[];
-        for (final element in xml.findAllElements('trkpt')) {
+        for (final element in trkpts) {
           final lat = double.tryParse(element.getAttribute('lat') ?? '');
           final lon = double.tryParse(element.getAttribute('lon') ?? '');
-          final timeText = element.getElement('time')?.innerText;
+          final timeEl = childByLocal(element, 'time');
+          final timeText = timeEl?.innerText;
           if (lat == null || lon == null || timeText == null) continue;
           final time = DateTime.tryParse(timeText);
           if (time == null) continue;
 
           var speedText = '0';
-          for (final extension in element.findElements('extensions')) {
-            final speeds = extension.findElements('speed');
-            if (speeds.isNotEmpty) {
-              speedText = speeds.first.innerText;
-              break;
-            }
+          final extEl = childByLocal(element, 'extensions');
+          if (extEl != null) {
+            final speedEl = childByLocal(extEl, 'speed');
+            if (speedEl != null) speedText = speedEl.innerText;
           }
           final speedMps = double.tryParse(speedText) ?? 0;
           if (!lat.isFinite || !lon.isFinite || lat < -90 || lat > 90 || lon < -180 || lon > 180) continue;
