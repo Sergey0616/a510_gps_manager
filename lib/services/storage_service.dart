@@ -81,14 +81,18 @@ class StorageService {
 
     for (final file in files) {
       try {
-        final content = await file.readAsString();
+        var content = await file.readAsString();
         debug += '\n${file.path.split('/').last}: ${content.length}b';
+        // Удаляем BOM и обрезаем пробелы — иначе XmlDocument.parse может упасть.
+        content = content.replaceFirst('\uFEFF', '').trim();
+        // Покажем начало файла для отладки.
+        debug += '; head=${content.substring(0, content.length > 60 ? 60 : content.length).replaceAll('\n', '|')}';
 
         final XmlDocument xml;
         try {
           xml = XmlDocument.parse(content);
         } catch (e) {
-          debugPrint('[GPS] XML parse error: $e');
+          debug += '; XMLERR:$e';
           continue;
         }
 
