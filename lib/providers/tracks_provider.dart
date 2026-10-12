@@ -147,7 +147,7 @@ class TracksProvider extends ChangeNotifier {
       _lastSync = DateTime.now();
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt('last_sync_ms', _lastSync!.millisecondsSinceEpoch);
-      _status = 'Готово: загружено файлов ${downloaded.length}, треков ${_tracks.length}';
+      _status = 'Готово: файлов ${downloaded.length}, треков ${_tracks.length}\n[DEBUG] ${storage.debug}';
     } catch (e) {
       _error = 'Синхронизация не удалась: $e';
       _status = 'Ошибка синхронизации';

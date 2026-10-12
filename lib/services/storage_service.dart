@@ -14,6 +14,9 @@ class StorageService {
   Directory? _gpsDirectory;
   Directory? _parsedDirectory;
 
+  /// Отладочная информация о последнем loadTracks().
+  String debug = '';
+
   Directory get gpsDirectory => _gpsDirectory ??
       (throw StateError('Хранилище не инициализировано'));
   Directory get parsedDirectory => _parsedDirectory ??
@@ -73,13 +76,13 @@ class StorageService {
         .where((entity) => entity is File && entity.path.toLowerCase().endsWith('.gpx'))
         .cast<File>()
         .toList();
-    debugPrint('[GPS] loadTracks: dir=${parsedDirectory.path} files=${files.length}');
+    debug = 'dir=${parsedDirectory.path}; files=${files.length}';
     final tracks = <Track>[];
 
     for (final file in files) {
       try {
         final content = await file.readAsString();
-        debugPrint('[GPS] ${file.path.split('/').last}: size=${content.length}');
+        debug += '\n${file.path.split('/').last}: ${content.length}b';
 
         final XmlDocument xml;
         try {
@@ -96,15 +99,15 @@ class StorageService {
             .where((e) => e.name.local == 'trkpt')
             .toList();
 
-        debugPrint('[GPS] strategy1 (descendants/local): ${trkpts.length}');
+        debug += '; s1=${trkpts.length}';
 
         if (trkpts.isEmpty) {
           trkpts = xml.findAllElements('trkpt', namespace: '*').toList();
-          debugPrint('[GPS] strategy2 (findAllElements ns=*): ${trkpts.length}');
+          debug += '; s2=${trkpts.length}';
         }
         if (trkpts.isEmpty) {
           trkpts = xml.descendants.whereType<XmlElement>().where((e) => e.name.toString().contains('trkpt')).toList();
-          debugPrint('[GPS] strategy3 (name contains): ${trkpts.length}');
+          debug += '; s3=${trkpts.length}';
         }
 
         final points = <GpsPoint>[];
@@ -145,7 +148,7 @@ class StorageService {
             speedKmh: speedMps * 3.6,
           ));
         }
-        debugPrint('[GPS] points parsed: ${points.length}');
+        debug += '; pts=${points.length}';
 
         if (points.isNotEmpty) {
           points.sort((a, b) => a.timestamp.compareTo(b.timestamp));
@@ -154,14 +157,14 @@ class StorageService {
             points: points,
             gpxPath: file.path,
           ));
-          debugPrint('[GPS] track added, total tracks=${tracks.length}');
+          debug += '; +track';
         }
       } catch (e, st) {
-        debugPrint('[GPS] file error: $e\n$st');
+        debug += '; ERR:$e';
         continue;
       }
     }
-    debugPrint('[GPS] loadTracks done: ${tracks.length} tracks');
+    debug += '; done=${tracks.length}';
     tracks.sort((a, b) => b.startUtc.compareTo(a.startUtc));
     return tracks;
   }
