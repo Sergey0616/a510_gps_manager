@@ -6,7 +6,8 @@ plugins {
 
 android {
     namespace "ru.a510.gpsmanager"
-    compileSdk flutter.compileSdkVersion
+    compileSdk 36
+    ndkVersion "27.0.12077973"
 
     defaultConfig {
         applicationId "ru.a510.gpsmanager"
