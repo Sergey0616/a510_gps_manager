@@ -9,6 +9,7 @@ class GpsParser {
 
   final int maxGapSeconds;
 
+  /// Парсит старый формат `/mnt/other/4g_gps/gps_*` (13 полей, speed в км/ч).
   Future<List<Track>> parseFiles(List<File> files) async {
     final points = <GpsPoint>[];
     for (final file in files) {
@@ -20,13 +21,32 @@ class GpsParser {
           if (point != null) points.add(point);
         }
       } on FileSystemException {
-        // Пропускаем недоступный файл и продолжаем обработку остальных.
         continue;
       } on FormatException {
         continue;
       }
     }
+    return _buildTracks(points);
+  }
 
+  /// Парсит новый формат `/mnt/sd/GPSData000001.txt`.
+  /// CSV, первая строка — заголовок `$V02`, далее 13 полей.
+  /// Формула скорости: speed_kmh = fields[4] / 1000.
+  Future<List<Track>> parseGpsDataFile(String content) async {
+    final points = <GpsPoint>[];
+    final lines = content.split(RegExp(r'\r?\n'));
+    for (var i = 0; i < lines.length; i++) {
+      final line = lines[i].trim();
+      if (line.isEmpty) continue;
+      if (line.startsWith('\$')) continue; // заголовок $V02
+      final point = _parseGpsDataLine(line);
+      if (point != null) points.add(point);
+    }
+    return _buildTracks(points);
+  }
+
+  /// Собирает точки в треки, объединяет близкие по времени и сортирует.
+  List<Track> _buildTracks(List<GpsPoint> points) {
     points.sort((a, b) => a.timestamp.compareTo(b.timestamp));
     if (points.isEmpty) return <Track>[];
 
@@ -73,6 +93,42 @@ class GpsParser {
         latitude: latitude,
         longitude: longitude,
         speedKmh: speed,
+      );
+    } on FormatException {
+      return null;
+    }
+  }
+
+  GpsPoint? _parseGpsDataLine(String line) {
+    final fields = line.split(',');
+    if (fields.length < 10) return null;
+
+    try {
+      final timestamp = int.parse(fields[0].trim());
+      final status = fields[1].trim();
+      if (status != 'A') return null; // только активные точки
+      final latitude = double.parse(fields[2].trim());
+      final longitude = double.parse(fields[3].trim());
+      final speedRaw = int.parse(fields[4].trim());
+      final courseRaw = int.tryParse(fields[5].trim()) ?? 0;
+      final tiltRaw = int.tryParse(fields[6].trim()) ?? 0;
+      final videoName = fields[9].trim();
+
+      if (timestamp < 0 ||
+          !latitude.isFinite ||
+          !longitude.isFinite ||
+          latitude < -90 || latitude > 90 ||
+          longitude < -180 || longitude > 180) {
+        return null;
+      }
+      return GpsPoint(
+        timestamp: timestamp,
+        latitude: latitude,
+        longitude: longitude,
+        speedKmh: speedRaw / 1000.0,
+        videoName: videoName.isEmpty ? null : videoName,
+        course: courseRaw,
+        tilt: tiltRaw,
       );
     } on FormatException {
       return null;

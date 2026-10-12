@@ -7,6 +7,9 @@ class GpsPoint {
     required this.latitude,
     required this.longitude,
     required this.speedKmh,
+    this.videoName,
+    this.course,
+    this.tilt,
   });
 
   /// Unix timestamp в секундах UTC.
@@ -14,6 +17,15 @@ class GpsPoint {
   final double latitude;
   final double longitude;
   final double speedKmh;
+
+  /// Имя MP4-файла (для GPSData-источника).
+  final String? videoName;
+
+  /// Курс в градусах (0-360).
+  final int? course;
+
+  /// Наклон в градусах.
+  final int? tilt;
 
   DateTime get timeUtc =>
       DateTime.fromMillisecondsSinceEpoch(timestamp * 1000, isUtc: true);

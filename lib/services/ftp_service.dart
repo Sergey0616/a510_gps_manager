@@ -80,4 +80,37 @@ class FtpService {
       await ftp.close();
     }
   }
+
+  /// Скачивает сводный GPS-лог `/mnt/sd/GPSData000001.txt`.
+  /// Возвращает локальный файл или null, если не удалось.
+  Future<File?> downloadGpsDataFile({required Directory destination}) async {
+    await destination.create(recursive: true);
+    final target = File('${destination.path}/GPSData000001.txt');
+    final temp = File('${destination.path}/GPSData000001.txt.part');
+    FtpClient? ftp;
+    try {
+      ftp = await FtpClient.connect(host, port, username, password);
+      final cwd = await ftp.command('CWD /mnt/sd');
+      if (cwd.code >= 400) {
+        print('[FTP] CWD /mnt/sd → ${cwd.code}: ${cwd.text}');
+        return null;
+      }
+      if (await temp.exists()) await temp.delete();
+      await ftp.retrieveFile('GPSData000001.txt', temp);
+      if (!await temp.exists() || await temp.length() == 0) {
+        print('[FTP] GPSData000001.txt пустой');
+        return null;
+      }
+      if (await target.exists()) await target.delete();
+      await temp.rename(target.path);
+      print('[FTP] GPSData000001.txt → ${await target.length()} байт');
+      return target;
+    } catch (e) {
+      print('[FTP] downloadGpsDataFile error: $e');
+      if (await temp.exists()) await temp.delete();
+      return null;
+    } finally {
+      await ftp?.close();
+    }
+  }
 }

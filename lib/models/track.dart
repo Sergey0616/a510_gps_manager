@@ -36,6 +36,12 @@ class Track {
     return seconds <= 0 ? 0 : distanceKm * 3600 / seconds;
   }
 
+  /// Уникальные имена MP4-файлов, связанных с точками трека.
+  Set<String> get videoNames => points
+      .where((p) => p.videoName != null && p.videoName!.isNotEmpty)
+      .map((p) => p.videoName!)
+      .toSet();
+
   static double _distanceBetween(GpsPoint a, GpsPoint b) {
     const earthRadiusKm = 6371.0088;
     final lat1 = a.latitude * math.pi / 180;

@@ -118,36 +118,61 @@ class TracksProvider extends ChangeNotifier {
     _progressTotal = 0;
     notifyListeners();
     try {
+      // === 1. GPSData000001.txt — полный трек за всё время ===
+      _status = 'Загрузка GPSData000001.txt…';
+      notifyListeners();
+      final gpsDataFile = await _ftp().downloadGpsDataFile(destination: storage.gpsDirectory);
+      var gpsDataTracks = <Track>[];
+      if (gpsDataFile != null) {
+        _status = 'Парсинг GPSData000001.txt…';
+        notifyListeners();
+        final content = await gpsDataFile.readAsString();
+        gpsDataTracks = await parser.parseGpsDataFile(content);
+        print('[Sync] GPSData: ${gpsDataTracks.length} треков');
+      }
+
+      // === 2. Свежие gps_* ===
+      _status = 'Загрузка свежих gps_*…';
+      notifyListeners();
       final downloaded = await _ftp().downloadGpsFiles(
         destination: storage.gpsDirectory,
         onProgress: (done, total) {
           _progressDone = done;
           _progressTotal = total;
-          _status = total == 0 ? 'GPS-файлы не найдены' : 'Загрузка: $done из $total';
+          _status = total == 0 ? 'Свежие gps_* не найдены' : 'Свежие: $done из $total';
           notifyListeners();
         },
       );
-      final allFiles = await storage.gpsDirectory
+      final freshFiles = await storage.gpsDirectory
           .list()
           .where((entity) => entity is File && RegExp(r'[/\\]gps_\d+$').hasMatch(entity.path))
           .cast<File>()
           .toList();
-      if (allFiles.isEmpty) {
-        throw StateError('FTP не вернул GPS-файлы; проверьте каталог $allFiles');
+      var freshTracks = <Track>[];
+      if (freshFiles.isNotEmpty) {
+        _status = 'Парсинг свежих gps_*…';
+        notifyListeners();
+        freshTracks = await parser.parseFiles(freshFiles);
       }
-      _status = 'Обработка GPS-точек…';
-      notifyListeners();
-      final parsedTracks = await parser.parseFiles(allFiles);
-      if (parsedTracks.isEmpty) {
-        throw const FormatException('В GPS-файлах не найдено корректных точек');
+
+      // === 3. Объединяем ===
+      final allTracks = <Track>[];
+      allTracks.addAll(gpsDataTracks);
+      allTracks.addAll(freshTracks);
+      print('[Sync] GPSData: ${gpsDataTracks.length}, fresh: ${freshTracks.length}, total: ${allTracks.length}');
+
+      if (allTracks.isEmpty) {
+        throw StateError('Не удалось получить ни одного трека');
       }
-      await storage.saveTracks(parsedTracks);
+
+      // === 4. Сохраняем ===
+      await storage.saveTracks(allTracks);
       _tracks = await storage.loadTracks();
       _sortTracks();
       _lastSync = DateTime.now();
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt('last_sync_ms', _lastSync!.millisecondsSinceEpoch);
-      _status = 'Готово: файлов ${downloaded.length}, треков ${_tracks.length}\n[DEBUG] ${storage.debug}';
+      _status = 'Готово: GPSData ${gpsDataTracks.length}, свежих ${freshTracks.length}, всего ${_tracks.length}';
     } catch (e) {
       _error = 'Синхронизация не удалась: $e';
       _status = 'Ошибка синхронизации';
