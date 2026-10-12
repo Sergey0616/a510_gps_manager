@@ -60,13 +60,16 @@ class VideoFile {
             : '/mnt/sd/Normal/Front';
         break;
       case VideoCategory.parking:
-        dir = '/mnt/sd/Parking';
+        dir = '/mnt/sd/Parking/Front';
         break;
       case VideoCategory.event:
-        dir = '/mnt/sd/Event';
+        dir = '/mnt/sd/Event/Front';
+        break;
+      case VideoCategory.lapse:
+        dir = '/mnt/sd/Lapse/Front';
         break;
       case VideoCategory.photo:
-        dir = '/mnt/sd/Photo';
+        dir = '/mnt/sd/Photo/Front';
         break;
     }
     return VideoFile(
