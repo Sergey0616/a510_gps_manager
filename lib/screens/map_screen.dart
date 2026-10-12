@@ -139,28 +139,66 @@ class _MapScreenState extends State<MapScreen> {
       );
       if (confirmed != true) return;
       if (!mounted) return;
-      final progress = ValueNotifier<double>(0);
+
+      // State: прогресс в МБ, скорость и ETA.
+      final downloadedMb = ValueNotifier<double>(0);
+      final totalMb = ValueNotifier<double>(0);
+      final speedMbs = ValueNotifier<double>(0);
+      final etaSec = ValueNotifier<int?>(null);
+
       showDialog<void>(
         context: context,
         barrierDismissible: false,
         builder: (_) => AlertDialog(
-          title: Text('Скачивание $name'),
-          content: ValueListenableBuilder<double>(
-            valueListenable: progress,
-            builder: (_, v, __) => Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                LinearProgressIndicator(value: v > 0 ? v : null),
-                const SizedBox(height: 8),
-                Text('${(v * 100).toStringAsFixed(0)} %'),
-              ],
-            ),
+          title: Text('Скачивание $name', maxLines: 1, overflow: TextOverflow.ellipsis),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ValueListenableBuilder<double>(
+                valueListenable: totalMb,
+                builder: (_, total, __) => ValueListenableBuilder<double>(
+                  valueListenable: downloadedMb,
+                  builder: (_, done, __) {
+                    final known = total > 0;
+                    final fraction = known ? (done / total).clamp(0.0, 1.0) : null;
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        LinearProgressIndicator(value: fraction),
+                        const SizedBox(height: 8),
+                        Text(known
+                            ? '${done.toStringAsFixed(1)} / ${total.toStringAsFixed(1)} МБ (${(fraction! * 100).toStringAsFixed(0)}%)'
+                            : 'Скачано: ${done.toStringAsFixed(1)} МБ'),
+                      ],
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 8),
+              ValueListenableBuilder<double>(
+                valueListenable: speedMbs,
+                builder: (_, s, __) => Text('Скорость: ${s.toStringAsFixed(2)} МБ/с'),
+              ),
+              ValueListenableBuilder<int?>(
+                valueListenable: etaSec,
+                builder: (_, e, __) => Text(e == null ? 'Осталось: —' : 'Осталось: $e сек'),
+              ),
+            ],
           ),
         ),
       );
+
+      // Небольшая задержка, чтобы диалог точно отрисовался.
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+
       try {
         await videoService.download(video, onProgress: (received, total, speed, remaining) {
-          if (total > 0) progress.value = received / total;
+          downloadedMb.value = received / (1024 * 1024);
+          // total может быть 0 для VideoFile.fromName — но download передаёт received.size когда не знает.
+          if (total > 0) totalMb.value = total / (1024 * 1024);
+          speedMbs.value = speed / (1024 * 1024);
+          etaSec.value = remaining?.inSeconds;
         });
       } catch (e) {
         if (mounted) {

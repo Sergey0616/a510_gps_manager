@@ -7,6 +7,7 @@ import 'package:xml/xml.dart';
 import '../models/gps_point.dart';
 import '../models/track.dart';
 import 'gpx_writer.dart';
+import 'storage_paths.dart';
 
 /// Локальное хранилище исходных CSV, GPX и сводной таблицы.
 class StorageService {
@@ -23,11 +24,7 @@ class StorageService {
       (throw StateError('Хранилище не инициализировано'));
 
   Future<void> initialize() async {
-    final external = await getExternalStorageDirectory();
-    if (external == null) {
-      throw FileSystemException('Внешний каталог приложения недоступен');
-    }
-    _root = Directory('${external.path}/A510_Exports');
+    _root = await StoragePaths.baseDir();
     _gpsDirectory = Directory('${_root!.path}/gps');
     _parsedDirectory = Directory('${_root!.path}/parsed');
     await gpsDirectory.create(recursive: true);

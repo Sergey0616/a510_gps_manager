@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../models/video_file.dart';
+import 'storage_paths.dart';
 
 /// FTP-доступ к видео с записью непосредственно в конечный файл.
 class VideoService {
@@ -72,9 +73,8 @@ class VideoService {
   }
 
   Future<String> videoRootPath() async {
-    final external = await getExternalStorageDirectory();
-    if (external == null) throw FileSystemException('Внешнее хранилище недоступно');
-    return '${external.path}/A510_Exports/video';
+    final base = await StoragePaths.baseDir();
+    return '${base.path}/video';
   }
 
   Future<int?> freeBytes() async {
@@ -99,6 +99,18 @@ class VideoService {
     _activeSession = session;
     final stopwatch = Stopwatch()..start();
     var received = 0;
+    var expectedTotal = video.sizeBytes;
+
+    // Если размер неизвестен (VideoFile.fromName), узнаём через FTP SIZE.
+    if (expectedTotal <= 0) {
+      try {
+        expectedTotal = await session.size(video.remotePath);
+        print('[Video] SIZE ${video.remotePath} = $expectedTotal bytes');
+      } catch (e) {
+        print('[Video] SIZE failed: $e');
+      }
+    }
+
     try {
       final dataSocket = await session.openRetrieve(video.remotePath);
       _activeDataSocket = dataSocket;
@@ -111,9 +123,9 @@ class VideoService {
           received += chunk.length;
           final elapsed = stopwatch.elapsedMilliseconds / 1000.0;
           final speed = elapsed > 0 ? received / elapsed : 0.0;
-          final total = video.sizeBytes > 0 ? video.sizeBytes : received;
+          final total = expectedTotal > 0 ? expectedTotal : received;
           final seconds = speed > 0 && total > received ? ((total - received) / speed).ceil() : null;
-          onProgress(received, video.sizeBytes, speed, seconds == null ? null : Duration(seconds: seconds));
+          onProgress(received, total, speed, seconds == null ? null : Duration(seconds: seconds));
         }
         await sink.flush();
         await sink.close();
@@ -125,8 +137,8 @@ class VideoService {
       }
       final completion = await session.readResponse();
       if (completion.code >= 400) throw FileSystemException('FTP RETR: ${completion.text}');
-      if (video.sizeBytes > 0 && received != video.sizeBytes) {
-        throw FileSystemException('Размер файла не совпал: получено $received из ${video.sizeBytes} байт');
+      if (expectedTotal > 0 && received != expectedTotal) {
+        throw FileSystemException('Размер файла не совпал: получено $received из $expectedTotal байт');
       }
       return destination;
     } catch (error) {
@@ -267,6 +279,33 @@ class _FtpSession {
       throw FileSystemException('FTP RETR: ${response.text}');
     }
     return data;
+  }
+
+  /// Возвращает размер файла (байт) через FTP SIZE. 0 — если не удалось.
+  Future<int> size(String path) async {
+    try {
+      final response = await command('SIZE $path');
+      if (response.code >= 400) {
+        // busybox ftpd может не поддерживать SIZE — тогда пробуем LIST.
+        return await _sizeViaList(path);
+      }
+      final match = RegExp(r'213\s+(\d+)').firstMatch(response.text);
+      if (match == null) return 0;
+      return int.tryParse(match.group(1)!) ?? 0;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  /// Fallback: получает размер файла через LIST <path>.
+  Future<int> _sizeViaList(String path) async {
+    try {
+      final entries = await list(path);
+      if (entries.isEmpty) return 0;
+      return entries.first.size;
+    } catch (_) {
+      return 0;
+    }
   }
 
   Future<void> close() async {

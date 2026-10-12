@@ -1,7 +1,9 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/tracks_provider.dart';
+import '../services/storage_paths.dart';
 import '../services/system_info_service.dart';
 import '../services/telnet_service.dart';
 
@@ -47,6 +49,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _username.dispose();
     _password.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickFolder() async {
+    try {
+      final picked = await FilePicker.platform.getDirectoryPath();
+      if (picked == null) return;
+      await StoragePaths.setCustomPath(picked);
+      await _reinitStorage();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Папка: $picked')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Ошибка выбора папки: $e')),
+      );
+    }
+  }
+
+  Future<void> _resetFolder() async {
+    await StoragePaths.setCustomPath(null);
+    await _reinitStorage();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Используется стандартная папка')),
+    );
+  }
+
+  Future<void> _reinitStorage() async {
+    final provider = context.read<TracksProvider>();
+    await provider.reloadFromDisk();
+    if (!mounted) return;
+    setState(() {});
   }
 
   Future<void> _save() async {
@@ -218,12 +254,62 @@ class _SettingsScreenState extends State<SettingsScreen> {
         if (_runningAction) const Center(child: Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator())),
         const Divider(height: 32),
         Text('Экспорт данных', style: Theme.of(context).textTheme.titleLarge),
-        ListTile(contentPadding: EdgeInsets.zero, leading: const Icon(Icons.folder), title: const Text('Папка сохранения'), subtitle: const Text('Каталог приложения /A510_Exports (GPS, GPX, видео и фото)')),
+        FutureBuilder<String?>(
+          future: StoragePaths.getCustomPath(),
+          builder: (context, snapshot) {
+            final custom = snapshot.data;
+            return FutureBuilder<String>(
+              future: custom ?? StoragePaths.defaultPath(),
+              builder: (context, pathSnap) {
+                final currentPath = pathSnap.data ?? '…';
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.folder),
+                      title: const Text('Папка сохранения'),
+                      subtitle: Text(
+                        currentPath,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _pickFolder,
+                            icon: const Icon(Icons.folder_open),
+                            label: const Text('Выбрать папку'),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        OutlinedButton(
+                          onPressed: custom == null ? null : _resetFolder,
+                          child: const Text('Сбросить'),
+                        ),
+                      ],
+                    ),
+                    if (custom == null)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 8),
+                        child: Text(
+                          'По умолчанию — приватная папка приложения. Выберите /Download/A510, чтобы файлы были видны в файловом менеджере.',
+                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                        ),
+                      ),
+                  ],
+                );
+              },
+            );
+          },
+        ),
         ListTile(contentPadding: EdgeInsets.zero, leading: const Icon(Icons.storage), title: const Text('Размер локальных данных'), subtitle: FutureBuilder<int>(future: provider.storageSizeBytes, builder: (context, snapshot) { if (snapshot.connectionState == ConnectionState.waiting) return const Text('Подсчёт…'); if (snapshot.hasError) return const Text('Не удалось определить размер'); return Text(_bytes(snapshot.data ?? 0)); })),
         SizedBox(height: 52, child: OutlinedButton.icon(style: OutlinedButton.styleFrom(foregroundColor: Theme.of(context).colorScheme.error), onPressed: _clearData, icon: const Icon(Icons.delete_forever), label: const Text('Очистить всё'))),
         const Divider(height: 32),
         Text('О приложении', style: Theme.of(context).textTheme.titleLarge),
-        const ListTile(contentPadding: EdgeInsets.zero, leading: Icon(Icons.info_outline), title: Text('70mai A510 GPS Manager'), subtitle: Text('Версия приложения: 1.0.0+1')),
+        const ListTile(contentPadding: EdgeInsets.zero, leading: Icon(Icons.info_outline), title: Text('70mai A510 GPS Manager'), subtitle: const Text('Версия приложения: 1.1.0+4')),
         ListTile(contentPadding: EdgeInsets.zero, leading: const Icon(Icons.code), title: const Text('GitHub-репозиторий'), subtitle: Text(_githubRepositoryUrl.isEmpty ? 'Ссылка не настроена — добавьте URL после публикации проекта.' : _githubRepositoryUrl), enabled: _githubRepositoryUrl.isNotEmpty, onTap: _githubRepositoryUrl.isEmpty ? null : () {}),
         SizedBox(height: 52, child: OutlinedButton.icon(onPressed: _resetSettings, icon: const Icon(Icons.settings_backup_restore), label: const Text('Сбросить настройки'))),
         const SizedBox(height: 12),

@@ -200,6 +200,14 @@ class TracksProvider extends ChangeNotifier {
     }
   }
 
+  /// Перечитать треки из хранилища (после смены папки).
+  Future<void> reloadFromDisk() async {
+    await storage.initialize();
+    _tracks = await storage.loadTracks();
+    _sortTracks();
+    notifyListeners();
+  }
+
   Future<void> deleteTrack(Track track) async {
     final path = track.gpxPath;
     if (path != null) {
