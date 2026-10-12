@@ -1,8 +1,8 @@
 import 'dart:io';
 
-import 'package:ftpconnect/ftpconnect.dart';
+import 'ftp_client.dart';
 
-/// Загрузка GPS CSV с FTP-сервера регистратора.
+/// Загрузка GPS CSV с FTP-сервера регистратора (совместимо с busybox ftpd).
 class FtpService {
   FtpService({
     required this.host,
@@ -18,31 +18,19 @@ class FtpService {
   final int port;
   final String remoteDirectory;
 
-  FTPConnect _client() => FTPConnect(
-        host,
-        port: port,
-        user: username,
-        pass: password,
-        timeout: 20,
-        showLog: false,
-      );
-
   Future<bool> testConnection() async {
-    final ftp = _client();
+    FtpClient? ftp;
     try {
-      final connected = await ftp.connect();
-      if (!connected) return false;
-      await ftp.changeDirectory(remoteDirectory);
-      await ftp.listDirectoryContent();
+      ftp = await FtpClient.connect(host, port, username, password);
+      final cwd = await ftp.command('CWD $remoteDirectory');
+      if (cwd.code >= 400) return false;
+      await ftp.list('.');
       return true;
-    } catch (_) {
+    } catch (e) {
+      print('[FTP] testConnection error: $e');
       return false;
     } finally {
-      try {
-        await ftp.disconnect();
-      } catch (_) {
-        // Игнорируем ошибку закрытия соединения.
-      }
+      await ftp?.close();
     }
   }
 
@@ -51,48 +39,50 @@ class FtpService {
     void Function(int completed, int total)? onProgress,
   }) async {
     await destination.create(recursive: true);
-    final ftp = _client();
     final downloaded = <File>[];
+    final ftp = await FtpClient.connect(host, port, username, password);
     try {
-      final connected = await ftp.connect();
-      if (!connected) throw const SocketException('FTP connect failed');
-      await ftp.changeDirectory(remoteDirectory);
-      final entries = await ftp.listDirectoryContent();
-      final names = entries
-          .map((entry) => entry.name)
-          .where((name) => RegExp(r'^gps_\d+$').hasMatch(name))
-          .toSet()
+      final cwd = await ftp.command('CWD $remoteDirectory');
+      if (cwd.code >= 400) {
+        throw SocketException('CWD $remoteDirectory → ${cwd.code}: ${cwd.text}');
+      }
+      final entries = await ftp.list('.');
+      final gpsFiles = entries
+          .where((e) => !e.isDirectory && RegExp(r'^gps_\d+$').hasMatch(e.name))
           .toList()
-        ..sort();
-      var completed = 0;
-      onProgress?.call(0, names.length);
-
-      for (final name in names) {
-        final target = File('${destination.path}/$name');
-        final temp = File('${destination.path}/$name.part');
+        ..sort((a, b) => a.name.compareTo(b.name));
+      print('[FTP] Found ${gpsFiles.length} gps files');
+      onProgress?.call(0, gpsFiles.length);
+      var done = 0;
+      for (final entry in gpsFiles) {
+        final target = File('${destination.path}/${entry.name}');
+        final temp = File('${destination.path}/${entry.name}.part');
         try {
           if (await temp.exists()) await temp.delete();
-          final ok = await ftp.downloadFile(name, temp);
-          if (!ok || !await temp.exists() || await temp.length() == 0) {
-            throw const FileSystemException('Незавершённая загрузка');
+          final dataSocket = await ftp.openRetrieve(entry.name);
+          final sink = temp.openWrite();
+          await dataSocket.pipe(sink);
+          await sink.flush();
+          await sink.close();
+          dataSocket.destroy();
+          if (!await temp.exists() || await temp.length() == 0) {
+            throw const FileSystemException('Получен пустой файл');
           }
           if (await target.exists()) await target.delete();
           await temp.rename(target.path);
           downloaded.add(target);
-        } catch (_) {
+          print('[FTP] ${entry.name} → ${await target.length()} байт');
+        } catch (e) {
+          print('[FTP] download ${entry.name} failed: $e');
           if (await temp.exists()) await temp.delete();
         } finally {
-          completed++;
-          onProgress?.call(completed, names.length);
+          done++;
+          onProgress?.call(done, gpsFiles.length);
         }
       }
       return downloaded;
     } finally {
-      try {
-        await ftp.disconnect();
-      } catch (_) {
-        // Закрытие FTP не должно скрывать результат операции.
-      }
+      await ftp.close();
     }
   }
 }
