@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../models/gps_point.dart';
 import '../models/track.dart';
 import '../services/ftp_service.dart';
 import '../services/gps_parser.dart';
