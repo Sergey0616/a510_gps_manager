@@ -13,6 +13,7 @@ import '../models/video_file.dart';
 import '../providers/tracks_provider.dart';
 import '../services/video_service.dart';
 import 'video_player_screen.dart';
+import '../widgets/animated_track_marker.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key, this.initialTrackId});
@@ -263,6 +264,14 @@ class _MapScreenState extends State<MapScreen> {
                   TileLayer(urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', userAgentPackageName: 'ru.a510.gpsmanager'),
                   PolylineLayer(polylines: polylines),
                   MarkerLayer(markers: markers),
+                  if (_selectedTrack != null && _selectedTrack!.points.length > 1)
+                    AnimatedTrackMarker(
+                      key: ValueKey('anim_${_selectedTrack!.id}'),
+                      points: _selectedTrack!.points
+                          .map((p) => p.position)
+                          .toList(),
+                      duration: const Duration(seconds: 30),
+                    ),
                   const RichAttributionWidget(attributions: [TextSourceAttribution('© OpenStreetMap contributors')]),
                 ],
               ),
