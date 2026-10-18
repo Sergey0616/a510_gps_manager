@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 /// Управление базовой папкой для сохранения файлов.
 class StoragePaths {
@@ -25,10 +26,17 @@ class StoragePaths {
       } catch (_) {}
     }
     // Запасной вариант — внутренняя папка приложения
-    final external = await getExternalStorageDirectory();
-    if (external == null) {
-      throw FileSystemException('Внешнее хранилище недоступно');
+    if (Platform.isAndroid) {
+      final publicDir = Directory('/storage/emulated/0/A510_Exports');
+      if (await Permission.manageExternalStorage.isGranted) {
+        try {
+          if (!await publicDir.exists()) await publicDir.create(recursive: true);
+          return publicDir;
+        } catch (_) {}
+      }
     }
+    final external = await getExternalStorageDirectory();
+    if (external == null) throw FileSystemException('Внешнее хранилище недоступно');
     return Directory('${external.path}/A510_Exports');
   }
 
