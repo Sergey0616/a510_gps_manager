@@ -165,12 +165,23 @@ class StorageService {
 
         if (points.isNotEmpty) {
           points.sort((a, b) => a.timestamp.compareTo(b.timestamp));
-          tracks.add(Track(
-            id: file.path.split('/').last.replaceFirst(RegExp(r'\.gpx$', caseSensitive: false), '').replaceFirst('track_', ''),
+          final candidate = Track(
+            id: file.path
+                .split('/')
+                .last
+                .replaceFirst(RegExp(r'\.gpx$', caseSensitive: false), '')
+                .replaceFirst('track_', ''),
             points: points,
             gpxPath: file.path,
-          ));
-          debug += '; +track';
+          );
+          if (candidate.points.length >= 2 &&
+              candidate.distanceKm >= 0.01) {
+            tracks.add(candidate);
+            debug += '; +track';
+          } else {
+            debug += '; skip(pts=${candidate.points.length},'
+                'dist=${candidate.distanceKm.toStringAsFixed(3)})';
+          }
         }
       } catch (e, st) {
         debug += '; ERR:$e';
