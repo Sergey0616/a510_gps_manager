@@ -25,6 +25,7 @@ class MapScreen extends StatefulWidget {
 
 class _MapScreenState extends State<MapScreen> {
   final MapController _mapController = MapController();
+  final GlobalKey<AnimatedTrackMarkerState> _animKey = GlobalKey();
   Track? _selectedTrack;
   static const _colors = <Color>[Colors.blue, Colors.deepPurple, Colors.orange, Colors.teal, Colors.pink, Colors.indigo, Colors.brown, Colors.cyan];
 
@@ -266,7 +267,8 @@ class _MapScreenState extends State<MapScreen> {
                   MarkerLayer(markers: markers),
                   if (_selectedTrack != null && _selectedTrack!.points.length > 1)
                     AnimatedTrackMarker(
-                      key: ValueKey('anim_${_selectedTrack!.id}'),
+                      key: _animKey,
+                      autoplay: false,
                       points: _selectedTrack!.points
                           .map((p) => p.position)
                           .toList(),
@@ -275,6 +277,24 @@ class _MapScreenState extends State<MapScreen> {
                   const RichAttributionWidget(attributions: [TextSourceAttribution('© OpenStreetMap contributors')]),
                 ],
               ),
+              if (_selectedTrack != null && _selectedTrack!.points.length > 1)
+                Positioned(
+                  right: 16,
+                  bottom: 120,
+                  child: FloatingActionButton(
+                    heroTag: 'play_anim',
+                    backgroundColor: Colors.blue,
+                    onPressed: () {
+                      _animKey.currentState?.restart();
+                      _mapController.fitCamera(CameraFit.bounds(
+                        bounds: LatLngBounds.fromPoints(_selectedTrack!.points.map((p) => p.position).toList()),
+                        padding: const EdgeInsets.all(48),
+                        maxZoom: 17,
+                      ));
+                    },
+                    child: const Icon(Icons.play_arrow, color: Colors.white),
+                  ),
+                ),
               Positioned(right: 12, bottom: 20, child: Column(children: [
                 FloatingActionButton.small(heroTag: 'zoom_in', tooltip: 'Приблизить', onPressed: () { final camera = _mapController.camera; _mapController.move(camera.center, camera.zoom + 1); }, child: const Icon(Icons.add)),
                 const SizedBox(height: 8),
