@@ -23,6 +23,7 @@ dependencies:
   media_kit_libs_video: ^1.0.4
   open_filex: ^4.5.0
   file_picker: ^8.1.2
+  saf: ^2.1.2
 
 dev_dependencies:
   flutter_test:

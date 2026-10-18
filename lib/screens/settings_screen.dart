@@ -1,4 +1,4 @@
-import 'package:file_picker/file_picker.dart';
+import '../services/local_folder_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -52,31 +52,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _pickFolder() async {
-    try {
-      final picked = await FilePicker.platform.getDirectoryPath();
-      if (picked == null) return;
-      await StoragePaths.setCustomPath(picked);
-      await _reinitStorage();
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Папка: $picked')),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка выбора папки: $e')),
-      );
-    }
-  }
-
-  Future<void> _resetFolder() async {
-    await StoragePaths.setCustomPath(null);
+  try {
+    final uri = await LocalFolderService.pickFolder();
+    if (uri == null) return;
+    final name = await LocalFolderService.getFolderName() ?? uri;
     await _reinitStorage();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Используется стандартная папка')),
+      SnackBar(content: Text('Папка: $name')),
+    );
+  } catch (e) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Ошибка выбора папки: $e')),
     );
   }
+}
+
+Future<void> _resetFolder() async {
+  await LocalFolderService.clearFolderUri();
+  await _reinitStorage();
+  if (!mounted) return;
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(content: Text('Локальная папка отключена')),
+  );
+}
 
   Future<void> _reinitStorage() async {
     final provider = context.read<TracksProvider>();
