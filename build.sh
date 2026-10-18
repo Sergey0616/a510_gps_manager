@@ -63,7 +63,7 @@ rm -rf .dart_tool/flutter_build 2>/dev/null || true
 # flutter build apk иногда возвращает exit 1 из-за бага file-watcher'а
 # ("Already watching path: .../android"), хотя APK успешно собирается.
 # Поэтому || true и проверяем оба возможных пути к APK.
-flutter build apk --release --build-name="1.1.0" --build-number=${GITHUB_RUN_NUMBER:-1} || true
+flutter build apk --release || true
 
 apk_flutter="build/app/outputs/flutter-apk/app-release.apk"
 apk_gradle="android/app/build/outputs/flutter-apk/app-release.apk"

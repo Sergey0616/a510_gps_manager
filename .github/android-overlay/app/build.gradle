@@ -13,8 +13,8 @@ android {
         applicationId "ru.a510.gpsmanager"
         minSdk 24
         targetSdk 34
-        versionCode flutterVersionCode.toInteger()
-        versionName flutterVersionName
+        versionCode System.getenv("GITHUB_RUN_NUMBER") != null ? Integer.parseInt(System.getenv("GITHUB_RUN_NUMBER")) : 10
+        versionName "1.1.0"
     }
 
     compileOptions {
