@@ -15,6 +15,16 @@ class StoragePaths {
       final d = Directory(custom);
       if (await d.exists()) return d;
     }
+    // Пытаемся использовать публичную папку, которая не удаляется при удалении приложения
+    if (Platform.isAndroid) {
+      final publicDir = Directory('/storage/emulated/0/A510_Exports');
+      try {
+        if (await publicDir.exists() || await publicDir.create(recursive: true) != null) {
+          return publicDir;
+        }
+      } catch (_) {}
+    }
+    // Запасной вариант — внутренняя папка приложения
     final external = await getExternalStorageDirectory();
     if (external == null) {
       throw FileSystemException('Внешнее хранилище недоступно');
