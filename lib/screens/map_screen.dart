@@ -252,6 +252,20 @@ class _MapScreenState extends State<MapScreen> {
                 IconButton(tooltip: 'Центрировать маршруты', icon: const Icon(Icons.center_focus_strong), onPressed: () => _fitAll(tracks)),
               ],
             ),
+            floatingActionButton: _selectedTrack != null
+              ? FloatingActionButton.extended(
+                  onPressed: () {
+                    _animKey.currentState?.restart();
+                    _mapController.fitCamera(CameraFit.bounds(
+                      bounds: LatLngBounds.fromPoints(_selectedTrack!.points.map((p) => p.position).toList()),
+                      padding: const EdgeInsets.all(48),
+                      maxZoom: 17,
+                    ));
+                  },
+                  icon: const Icon(Icons.play_arrow),
+                  label: const Text('Play'),
+                )
+              : null,
             body: Stack(children: [
               FlutterMap(
                 mapController: _mapController,
@@ -263,39 +277,9 @@ class _MapScreenState extends State<MapScreen> {
                 ),
                 children: [
                   TileLayer(urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', userAgentPackageName: 'ru.a510.gpsmanager'),
-                  PolylineLayer(polylines: polylines),
-                  MarkerLayer(markers: markers),
-                  if (_selectedTrack != null && _selectedTrack!.points.length > 1)
-                    AnimatedTrackMarker(
-                      key: _animKey,
-                      autoplay: false,
-                      points: _selectedTrack!.points
-                          .map((p) => p.position)
-                          .toList(),
-                      duration: const Duration(seconds: 30),
-                    ),
-                  const RichAttributionWidget(attributions: [TextSourceAttribution('© OpenStreetMap contributors')]),
-                ],
-              ),
-              if (_selectedTrack != null && _selectedTrack!.points.length > 1)
-                Positioned(
-                  right: 16,
-                  bottom: 120,
-                  child: FloatingActionButton(
-                    heroTag: 'play_anim',
-                    backgroundColor: Colors.blue,
-                    onPressed: () {
-                      _animKey.currentState?.restart();
-                      _mapController.fitCamera(CameraFit.bounds(
-                        bounds: LatLngBounds.fromPoints(_selectedTrack!.points.map((p) => p.position).toList()),
-                        padding: const EdgeInsets.all(48),
-                        maxZoom: 17,
-                      ));
-                    },
-                    child: const Icon(Icons.play_arrow, color: Colors.white),
-                  ),
-                ),
-              Positioned(right: 12, bottom: 20, child: Column(children: [
+                  PolylineLayer(polylines: _selectedTrack != null ? [Polyline(points: _selectedTrack!.points.map((p) => p.position).toList(), strokeWidth: 4.0, color: Colors.blue)] : polylines),
+                  MarkerLayer(markers: _selectedTrack != null ? [] : markers),
+                  Positioned(right: 12, bottom: 20, child: Column(children: [
                 FloatingActionButton.small(heroTag: 'zoom_in', tooltip: 'Приблизить', onPressed: () { final camera = _mapController.camera; _mapController.move(camera.center, camera.zoom + 1); }, child: const Icon(Icons.add)),
                 const SizedBox(height: 8),
                 FloatingActionButton.small(heroTag: 'zoom_out', tooltip: 'Отдалить', onPressed: () { final camera = _mapController.camera; _mapController.move(camera.center, camera.zoom - 1); }, child: const Icon(Icons.remove)),
