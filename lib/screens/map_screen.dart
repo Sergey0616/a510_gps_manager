@@ -266,13 +266,14 @@ class _MapScreenState extends State<MapScreen> {
                   label: const Text('Play'),
                 )
               : null,
+            floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
             body: Stack(children: [
               FlutterMap(
                 mapController: _mapController,
                 options: MapOptions(
                   initialCenter: startTrack.points.first.position,
                   initialZoom: 13,
-                  onTap: (_, __) => setState(() => _selectedTrack = null),
+                  
                   onLongPress: (_, tapPoint) => _handleLongPress(tapPoint, tracks),
                 ),
                 children: [
