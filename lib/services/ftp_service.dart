@@ -4,19 +4,7 @@ import 'ftp_client.dart';
 
 /// Загрузка GPS CSV с FTP-сервера регистратора (совместимо с busybox ftpd).
 class FtpService {
-  Future<InternetAddress?> _getWifiAddress() async {
-    try {
-      final interfaces = await NetworkInterface.list(type: InternetAddressType.IPv4);
-      for (final iface in interfaces) {
-        if (iface.name.startsWith('wlan')) {
-          for (final addr in iface.addresses) {
-            if (!addr.isLoopback) return addr;
-          }
-        }
-      }
-    } catch (_) {}
-    return null;
-  }
+
 
   FtpService({
     required this.host,
@@ -24,7 +12,10 @@ class FtpService {
     required this.password,
     this.port = 21,
     this.remoteDirectory = '/mnt/other/4g_gps',
+    this.sourceAddress,
   });
+
+  final InternetAddress? sourceAddress;
 
   final String host;
   final String username;
@@ -35,7 +26,7 @@ class FtpService {
   Future<bool> testConnection() async {
     FtpClient? ftp;
     try {
-      ftp = await FtpClient.connect(host, port, username, password, sourceAddress: await _getWifiAddress());
+      ftp = await FtpClient.connect(host, port, username, password, sourceAddress: sourceAddress);
       final cwd = await ftp.command('CWD $remoteDirectory');
       if (cwd.code >= 400) return false;
       await ftp.list('.');
@@ -54,7 +45,7 @@ class FtpService {
   }) async {
     await destination.create(recursive: true);
     final downloaded = <File>[];
-    final ftp = await FtpClient.connect(host, port, username, password, sourceAddress: await _getWifiAddress());
+    final ftp = await FtpClient.connect(host, port, username, password, sourceAddress: sourceAddress);
     try {
       final cwd = await ftp.command('CWD $remoteDirectory');
       if (cwd.code >= 400) {
@@ -100,7 +91,7 @@ class FtpService {
     FtpClient? ftp;
     int deleted = 0;
     try {
-      ftp = await FtpClient.connect(host, port, username, password, sourceAddress: await _getWifiAddress());
+      ftp = await FtpClient.connect(host, port, username, password, sourceAddress: sourceAddress);
       final paths = ['/mnt/sd/Event', '/mnt/sd/events', '/mnt/sd/DCIM/Event', '/mnt/sd/DCIM/events'];
       bool found = false;
       for (final path in paths) {
@@ -135,7 +126,7 @@ class FtpService {
     final temp = File('${destination.path}/GPSData000001.txt.part');
     FtpClient? ftp;
     try {
-      ftp = await FtpClient.connect(host, port, username, password, sourceAddress: await _getWifiAddress());
+      ftp = await FtpClient.connect(host, port, username, password, sourceAddress: sourceAddress);
       final cwd = await ftp.command('CWD /mnt/sd');
       if (cwd.code >= 400) {
         print('[FTP] CWD /mnt/sd → ${cwd.code}: ${cwd.text}');

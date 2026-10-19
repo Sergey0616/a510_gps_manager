@@ -15,7 +15,20 @@ class MainActivity : FlutterActivity() {
         super.configureFlutterEngine(flutterEngine)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, channelName)
             .setMethodCallHandler { call, result ->
-                if (call.method == "getWifiSsid") {
+                if (call.method == "getWifiIp") {
+                    try {
+                        val manager = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+                        val ip = manager.connectionInfo?.ipAddress
+                        if (ip != null && ip != 0) {
+                            val ipString = String.format("%d.%d.%d.%d", (ip and 0xff), (ip shr 8 and 0xff), (ip shr 16 and 0xff), (ip shr 24 and 0xff))
+                            result.success(ipString)
+                        } else {
+                            result.success(null)
+                        }
+                    } catch (error: Exception) {
+                        result.error("IP_ERROR", error.message, null)
+                    }
+                } else if (call.method == "getWifiSsid") {
                     try {
                         val manager = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
                         result.success(manager.connectionInfo?.ssid)
