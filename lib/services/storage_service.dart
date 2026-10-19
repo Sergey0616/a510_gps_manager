@@ -176,7 +176,7 @@ class StorageService {
           );
           final hasVideo = candidate.points.any((p) => p.videoName != null);
           final hasMovement = candidate.points.length >= 2 &&
-              candidate.distanceKm >= 0.001;
+              candidate.distanceKm >= 0.05;
           if (hasMovement || hasVideo) {
             tracks.add(candidate);
             debug += '; +track';

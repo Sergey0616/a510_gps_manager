@@ -45,7 +45,7 @@ class HomeScreen extends StatelessWidget {
                 ],
                 const SizedBox(height: 16),
                 SizedBox(height: 62, child: FilledButton.icon(
-                  onPressed: provider.busy ? null : provider.synchronize,
+                  onPressed: provider.busy ? null : () => _showSyncDialog(context, provider),
                   icon: const Icon(Icons.sync),
                   label: const Text('Синхронизировать GPS', style: TextStyle(fontSize: 17)),
                 )),
@@ -80,6 +80,32 @@ class HomeScreen extends StatelessWidget {
           ),
         ),
       );
+
+  void _showSyncDialog(BuildContext context, TracksProvider provider) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Откуда синхронизировать?'),
+        content: const Text('Выберите источник данных:'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              provider.syncViaFtp();
+            },
+            child: const Text('С регистратора (Wi-Fi)'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              provider.syncFromLocalFolder();
+            },
+            child: const Text('Из локальной папки'),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _StatRow extends StatelessWidget {

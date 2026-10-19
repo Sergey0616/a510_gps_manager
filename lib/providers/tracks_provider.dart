@@ -126,9 +126,9 @@ Future<void> synchronize() async {
   try {
     final onRecorder = await _isOnRecorderWifi();
     if (onRecorder) {
-      await _syncViaFtp();
+      await syncViaFtp();
     } else {
-      await _syncFromLocalFolder();
+      await syncFromLocalFolder();
     }
   } catch (e) {
     _error = 'Синхронизация не удалась: $e';
@@ -152,7 +152,7 @@ Future<bool> _isOnRecorderWifi() async {
   }
 }
 
-Future<void> _syncViaFtp() async {
+Future<void> syncViaFtp() async {
   _status = 'Загрузка GPSData000001.txt…';
   notifyListeners();
   final gpsDataFile =
@@ -224,7 +224,7 @@ Future<void> _syncViaFtp() async {
       'свежих ${freshTracks.length}, всего ${_tracks.length}';
 }
 
-Future<void> _syncFromLocalFolder() async {
+Future<void> syncFromLocalFolder() async {
   _status = 'Чтение локальной папки…';
   notifyListeners();
 
