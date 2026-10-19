@@ -289,7 +289,11 @@ Future<void> deleteTrack(Track track) async {
   notifyListeners();
 }
 
-Future<void> clearAllTracks() async {
+Future<int> deleteRecorderVideos() async {
+    return await _ftp().deleteEventVideos();
+  }
+
+  Future<void> clearAllTracks() async {
   await storage.clearAll();
   _tracks = <Track>[];
   _lastSync = null;

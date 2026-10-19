@@ -137,6 +137,33 @@ Future<void> _resetFolder() async {
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Видео удалены')));
   }
 
+  Future<void> _clearRecorderVideos() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Удалить видео с регистратора?'),
+        content: const Text('Будут удалены все файлы из папки Event на флешке регистратора.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Отмена')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Удалить')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _runningAction = true);
+    try {
+      final provider = context.read<TracksProvider>();
+      final count = await provider.deleteRecorderVideos();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Удалено файлов с регистратора: $count')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+    } finally {
+      if (mounted) setState(() => _runningAction = false);
+    }
+  }
+
   Future<void> _clearData() async {
     final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
       title: const Text('Удалить все данные?'),
@@ -328,6 +355,8 @@ Future<void> _resetFolder() async {
         ),
         ListTile(contentPadding: EdgeInsets.zero, leading: const Icon(Icons.storage), title: const Text('Размер локальных данных'), subtitle: FutureBuilder<int>(future: provider.storageSizeBytes, builder: (context, snapshot) { if (snapshot.connectionState == ConnectionState.waiting) return const Text('Подсчёт…'); if (snapshot.hasError) return const Text('Не удалось определить размер'); return Text(_bytes(snapshot.data ?? 0)); })),
         SizedBox(height: 52, child: OutlinedButton.icon(style: OutlinedButton.styleFrom(foregroundColor: Theme.of(context).colorScheme.primary), onPressed: _clearVideos, icon: const Icon(Icons.video_library), label: const Text('Очистить скачанные видео'))),
+        const SizedBox(height: 8),
+        SizedBox(height: 52, child: OutlinedButton.icon(style: OutlinedButton.styleFrom(foregroundColor: Theme.of(context).colorScheme.error), onPressed: _clearRecorderVideos, icon: const Icon(Icons.videocam_off), label: const Text('Удалить видео с регистратора'))),
         const SizedBox(height: 8),
         SizedBox(height: 52, child: OutlinedButton.icon(style: OutlinedButton.styleFrom(foregroundColor: Theme.of(context).colorScheme.error), onPressed: _clearData, icon: const Icon(Icons.delete_forever), label: const Text('Очистить всё'))),
         const Divider(height: 32),

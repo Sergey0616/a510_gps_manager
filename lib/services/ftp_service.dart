@@ -4,6 +4,20 @@ import 'ftp_client.dart';
 
 /// Загрузка GPS CSV с FTP-сервера регистратора (совместимо с busybox ftpd).
 class FtpService {
+  Future<InternetAddress?> _getWifiAddress() async {
+    try {
+      final interfaces = await NetworkInterface.list(type: InternetAddressType.IPv4);
+      for (final iface in interfaces) {
+        if (iface.name.startsWith('wlan')) {
+          for (final addr in iface.addresses) {
+            if (!addr.isLoopback) return addr;
+          }
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
   FtpService({
     required this.host,
     required this.username,
@@ -21,7 +35,7 @@ class FtpService {
   Future<bool> testConnection() async {
     FtpClient? ftp;
     try {
-      ftp = await FtpClient.connect(host, port, username, password);
+      ftp = await FtpClient.connect(host, port, username, password, sourceAddress: await _getWifiAddress());
       final cwd = await ftp.command('CWD $remoteDirectory');
       if (cwd.code >= 400) return false;
       await ftp.list('.');
@@ -40,7 +54,7 @@ class FtpService {
   }) async {
     await destination.create(recursive: true);
     final downloaded = <File>[];
-    final ftp = await FtpClient.connect(host, port, username, password);
+    final ftp = await FtpClient.connect(host, port, username, password, sourceAddress: await _getWifiAddress());
     try {
       final cwd = await ftp.command('CWD $remoteDirectory');
       if (cwd.code >= 400) {
@@ -81,6 +95,38 @@ class FtpService {
     }
   }
 
+
+  Future<int> deleteEventVideos() async {
+    FtpClient? ftp;
+    int deleted = 0;
+    try {
+      ftp = await FtpClient.connect(host, port, username, password, sourceAddress: await _getWifiAddress());
+      final paths = ['/mnt/sd/Event', '/mnt/sd/events', '/mnt/sd/DCIM/Event', '/mnt/sd/DCIM/events'];
+      bool found = false;
+      for (final path in paths) {
+        final cwd = await ftp.command('CWD $path');
+        if (cwd.code < 400) {
+          found = true;
+          break;
+        }
+      }
+      if (!found) return 0;
+      final entries = await ftp.list('.');
+      for (final entry in entries) {
+        if (entry.isDirectory) continue;
+        try {
+          await ftp.command('DELE ${entry.name}');
+          deleted++;
+        } catch (_) {}
+      }
+    } catch (e) {
+      print('[FTP] deleteEventVideos error: $e');
+    } finally {
+      await ftp?.close();
+    }
+    return deleted;
+  }
+
   /// Скачивает сводный GPS-лог `/mnt/sd/GPSData000001.txt`.
   /// Возвращает локальный файл или null, если не удалось.
   Future<File?> downloadGpsDataFile({required Directory destination}) async {
@@ -89,7 +135,7 @@ class FtpService {
     final temp = File('${destination.path}/GPSData000001.txt.part');
     FtpClient? ftp;
     try {
-      ftp = await FtpClient.connect(host, port, username, password);
+      ftp = await FtpClient.connect(host, port, username, password, sourceAddress: await _getWifiAddress());
       final cwd = await ftp.command('CWD /mnt/sd');
       if (cwd.code >= 400) {
         print('[FTP] CWD /mnt/sd → ${cwd.code}: ${cwd.text}');
