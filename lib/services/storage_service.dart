@@ -174,8 +174,10 @@ class StorageService {
             points: points,
             gpxPath: file.path,
           );
-          if (candidate.points.length >= 2 &&
-              candidate.distanceKm >= 0.01) {
+          final hasVideo = candidate.points.any((p) => p.videoName != null);
+          final hasMovement = candidate.points.length >= 2 &&
+              candidate.distanceKm >= 0.001;
+          if (hasMovement || hasVideo) {
             tracks.add(candidate);
             debug += '; +track';
           } else {
@@ -207,6 +209,16 @@ class StorageService {
       }
     }
     return total;
+  }
+
+  Future<void> clearVideos() async {
+    final root = _root;
+    if (root == null) return;
+    final videoDir = Directory('${root.path}/videos');
+    if (await videoDir.exists()) {
+      await videoDir.delete(recursive: true);
+      await videoDir.create(recursive: true);
+    }
   }
 
   Future<void> clearAll() async {

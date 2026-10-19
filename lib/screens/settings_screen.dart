@@ -116,6 +116,27 @@ Future<void> _resetFolder() async {
     }
   }
 
+  Future<void> _clearVideos() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Удалить все видео?'),
+        content: const Text('Будут удалены все скачанные видеофайлы. Треки останутся.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Отмена')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Удалить')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    
+    final provider = context.read<TracksProvider>();
+    await provider.storage.clearVideos();
+    if (!mounted) return;
+    setState(() {});
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Видео удалены')));
+  }
+
   Future<void> _clearData() async {
     final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
       title: const Text('Удалить все данные?'),
@@ -255,11 +276,11 @@ Future<void> _resetFolder() async {
         const Divider(height: 32),
         Text('Экспорт данных', style: Theme.of(context).textTheme.titleLarge),
         FutureBuilder<String?>(
-          future: StoragePaths.getCustomPath(),
+          future: LocalFolderService.getFolderName(),
           builder: (context, snapshot) {
             final custom = snapshot.data;
             return FutureBuilder<String>(
-              future: custom != null ? Future.value(custom) : StoragePaths.defaultPath(),
+              future: custom != null && custom.isNotEmpty ? Future.value('Выбрана папка: $custom') : StoragePaths.defaultPath(),
               builder: (context, pathSnap) {
                 final currentPath = pathSnap.data ?? '…';
                 return Column(
@@ -306,6 +327,8 @@ Future<void> _resetFolder() async {
           },
         ),
         ListTile(contentPadding: EdgeInsets.zero, leading: const Icon(Icons.storage), title: const Text('Размер локальных данных'), subtitle: FutureBuilder<int>(future: provider.storageSizeBytes, builder: (context, snapshot) { if (snapshot.connectionState == ConnectionState.waiting) return const Text('Подсчёт…'); if (snapshot.hasError) return const Text('Не удалось определить размер'); return Text(_bytes(snapshot.data ?? 0)); })),
+        SizedBox(height: 52, child: OutlinedButton.icon(style: OutlinedButton.styleFrom(foregroundColor: Theme.of(context).colorScheme.primary), onPressed: _clearVideos, icon: const Icon(Icons.video_library), label: const Text('Очистить скачанные видео'))),
+        const SizedBox(height: 8),
         SizedBox(height: 52, child: OutlinedButton.icon(style: OutlinedButton.styleFrom(foregroundColor: Theme.of(context).colorScheme.error), onPressed: _clearData, icon: const Icon(Icons.delete_forever), label: const Text('Очистить всё'))),
         const Divider(height: 32),
         Text('О приложении', style: Theme.of(context).textTheme.titleLarge),
