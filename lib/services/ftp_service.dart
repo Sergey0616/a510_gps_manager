@@ -48,7 +48,7 @@ class FtpService {
       if (cwd.code >= 400) {
         throw SocketException('CWD $remoteDirectory → ${cwd.code}: ${cwd.text}');
       }
-      final entries = await ftp.list('.');
+      final entries = await ftp.list('.').timeout(const Duration(seconds: 30));
       final gpsFiles = entries
           .where((e) => !e.isDirectory && RegExp(r'^gps_\d+$').hasMatch(e.name))
           .toList()
@@ -59,9 +59,14 @@ class FtpService {
       for (final entry in gpsFiles) {
         final target = File('${destination.path}/${entry.name}');
         final temp = File('${destination.path}/${entry.name}.part');
+        if (await target.exists()) {
+          done++;
+          onProgress?.call(done, gpsFiles.length);
+          continue;
+        }
         try {
           if (await temp.exists()) await temp.delete();
-          await ftp.retrieveFile(entry.name, temp);
+          await ftp.retrieveFile(entry.name, temp).timeout(const Duration(seconds: 30));
           if (!await temp.exists() || await temp.length() == 0) {
             throw const FileSystemException('Получен пустой файл');
           }
@@ -99,7 +104,7 @@ class FtpService {
         }
       }
       if (!found) return 0;
-      final entries = await ftp.list('.');
+      final entries = await ftp.list('.').timeout(const Duration(seconds: 30));
       for (final entry in entries) {
         if (entry.isDirectory) continue;
         try {
@@ -130,7 +135,7 @@ class FtpService {
         return null;
       }
       if (await temp.exists()) await temp.delete();
-      await ftp.retrieveFile('GPSData000001.txt', temp);
+      await ftp.retrieveFile('GPSData000001.txt', temp).timeout(const Duration(seconds: 90));
       if (!await temp.exists() || await temp.length() == 0) {
         print('[FTP] GPSData000001.txt пустой');
         return null;
