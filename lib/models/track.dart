@@ -19,7 +19,9 @@ class Track {
       ? Duration.zero
       : endUtc.difference(startUtc);
 
-  double get distanceKm {
+  late final double distanceKm = _calculateDistance();
+
+  double _calculateDistance() {
     var distance = 0.0;
     for (var i = 1; i < points.length; i++) {
       distance += _distanceBetween(points[i - 1], points[i]);

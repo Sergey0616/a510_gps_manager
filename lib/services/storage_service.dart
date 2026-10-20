@@ -78,6 +78,7 @@ class StorageService {
 
     for (final file in files) {
       try {
+        await Future.delayed(Duration.zero);
         var content = await file.readAsString();
         debug += '\n${file.path.split('/').last}: ${content.length}b';
         // Удаляем BOM и обрезаем пробелы — иначе XmlDocument.parse может упасть.
