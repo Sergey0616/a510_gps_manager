@@ -12,11 +12,15 @@ class GpsParser {
   /// Парсит старый формат `/mnt/other/4g_gps/gps_*` (13 полей, speed в км/ч).
   Future<List<Track>> parseFiles(List<File> files) async {
     final points = <GpsPoint>[];
-    for (final file in files) {
+    print('[Parser] Начинаем парсинг ${files.length} файлов');
+    for (var i = 0; i < files.length; i++) {
+      final file = files[i];
       try {
         if (!await file.exists()) continue;
-        final content = await file.readAsString();
-        for (final line in content.split(RegExp(r'\r?\n'))) {
+        print('[Parser] Файл ${i + 1}/${files.length}: ${file.path.split('/').last}');
+        // Читаем построчно, чтобы не загружать весь файл в память
+        final lines = await file.readAsLines();
+        for (final line in lines) {
           final point = _parseLine(line);
           if (point != null) points.add(point);
         }
@@ -26,7 +30,10 @@ class GpsParser {
         continue;
       }
     }
-    return _buildTracks(points);
+    print('[Parser] Собрано ${points.length} точек. Строим треки...');
+    final tracks = _buildTracks(points);
+    print('[Parser] Готово. Треков: ${tracks.length}');
+    return tracks;
   }
 
   /// Парсит новый формат `/mnt/sd/GPSData000001.txt`.
