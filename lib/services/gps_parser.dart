@@ -83,7 +83,7 @@ class GpsParser {
   GpsPoint? _parseLine(String line) {
     if (line.trim().isEmpty) return null;
     final fields = line.trim().split(',');
-    if (fields.length != 13) return null;
+    if (fields.length < 13) return null;
 
     try {
       final timestamp = int.parse(fields[0].trim());

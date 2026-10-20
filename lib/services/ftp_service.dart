@@ -66,7 +66,7 @@ class FtpService {
         }
         try {
           if (await temp.exists()) await temp.delete();
-          await ftp.retrieveFile(entry.name, temp).timeout(const Duration(seconds: 30));
+          await ftp.retrieveFile(entry.name, temp);
           if (!await temp.exists() || await temp.length() == 0) {
             throw const FileSystemException('Получен пустой файл');
           }
@@ -135,7 +135,7 @@ class FtpService {
         return null;
       }
       if (await temp.exists()) await temp.delete();
-      await ftp.retrieveFile('GPSData000001.txt', temp).timeout(const Duration(seconds: 90));
+      await ftp.retrieveFile('GPSData000001.txt', temp);
       if (!await temp.exists() || await temp.length() == 0) {
         print('[FTP] GPSData000001.txt пустой');
         return null;
