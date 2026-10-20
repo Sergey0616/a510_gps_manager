@@ -2,6 +2,7 @@ import 'dart:io';
 
 import '../models/gps_point.dart';
 import '../models/track.dart';
+import 'app_logger.dart';
 
 /// Парсер CSV GPS регистратора.
 class GpsParser {
@@ -58,6 +59,7 @@ class GpsParser {
 
   /// Собирает точки в треки, объединяет близкие по времени и сортирует.
   List<Track> _buildTracks(List<GpsPoint> points) {
+    AppLogger.log('[Parser] _buildTracks: входных точек ${points.length}');
     points.sort((a, b) => a.timestamp.compareTo(b.timestamp));
     if (points.isEmpty) return <Track>[];
 
@@ -77,6 +79,7 @@ class GpsParser {
     if (current.isNotEmpty) {
       tracks.add(Track(id: _trackId(current.first, number), points: current));
     }
+    AppLogger.log('[Parser] _buildTracks: создано ${tracks.length} треков');
     return tracks;
   }
 

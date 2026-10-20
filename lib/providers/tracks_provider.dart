@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/gps_point.dart';
 import '../models/track.dart';
 import '../services/ftp_service.dart';
+import '../services/app_logger.dart';
 import '../services/gps_parser.dart';
 import '../services/local_folder_service.dart';
 import '../services/storage_service.dart';
@@ -163,7 +164,7 @@ Future<void> syncViaFtp() async {
     notifyListeners();
     final content = await gpsDataFile.readAsString();
     gpsDataTracks = await parser.parseGpsDataFile(content);
-    print('[Sync] GPSData: ${gpsDataTracks.length} треков');
+    AppLogger.log('[Sync] GPSData: ${gpsDataTracks.length} треков');
   }
 
   _status = 'Загрузка свежих gps_*…';
@@ -202,13 +203,13 @@ Future<void> syncViaFtp() async {
       merged[p.timestamp] = p;
     }
   }
-  print('[Sync] GPSData: ${gpsDataTracks.length}, '
+  AppLogger.log('[Sync] GPSData: ${gpsDataTracks.length}, '
       'fresh: ${freshTracks.length}, merged points: ${merged.length}');
 
   final mergedPoints = merged.values.toList()
     ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
   final allTracks = parser.buildTracksFromPoints(mergedPoints);
-  print('[Sync] total tracks: ${allTracks.length}');
+  AppLogger.log('[Sync] total tracks: ${allTracks.length}');
 
   if (allTracks.isEmpty) {
     throw StateError('Не удалось получить ни одного трека');

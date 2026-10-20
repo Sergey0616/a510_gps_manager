@@ -1,10 +1,12 @@
 import '../services/local_folder_service.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/tracks_provider.dart';
 import '../services/storage_paths.dart';
 import '../services/system_info_service.dart';
+import '../services/app_logger.dart';
 import '../services/telnet_service.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -359,6 +361,70 @@ Future<void> _resetFolder() async {
         SizedBox(height: 52, child: OutlinedButton.icon(style: OutlinedButton.styleFrom(foregroundColor: Theme.of(context).colorScheme.error), onPressed: _clearRecorderVideos, icon: const Icon(Icons.videocam_off), label: const Text('Удалить видео с регистратора'))),
         const SizedBox(height: 8),
         SizedBox(height: 52, child: OutlinedButton.icon(style: OutlinedButton.styleFrom(foregroundColor: Theme.of(context).colorScheme.error), onPressed: _clearData, icon: const Icon(Icons.delete_forever), label: const Text('Очистить всё'))),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.bug_report),
+          title: const Text('Показать локальный лог (отладка)'),
+          onTap: () {
+            final log = AppLogger.getLog();
+            showDialog(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: const Text('Локальный лог'),
+                content: SingleChildScrollView(
+                  child: SelectableText(log.isEmpty ? 'Лог пуст' : log),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: log));
+                      Navigator.pop(ctx);
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Лог скопирован')));
+                    },
+                    child: const Text('Копировать'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Закрыть'),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+        const Divider(height: 32),
+                ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.bug_report),
+          title: const Text('Локальный лог (отладка)'),
+          subtitle: const Text('Скопируйте и отправьте разработчику'),
+          onTap: () {
+            final log = AppLogger.getLog();
+            showDialog(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: const Text('Локальный лог'),
+                content: SizedBox(
+                  width: double.maxFinite,
+                  child: SingleChildScrollView(
+                    child: SelectableText(log.isEmpty ? 'Лог пуст' : log, style: const TextStyle(fontSize: 12)),
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: log));
+                      Navigator.pop(ctx);
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Скопировано')));
+                    },
+                    child: const Text('Копировать'),
+                  ),
+                  TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Закрыть')),
+                ],
+              ),
+            );
+          },
+        ),
         const Divider(height: 32),
         Text('О приложении', style: Theme.of(context).textTheme.titleLarge),
         const ListTile(contentPadding: EdgeInsets.zero, leading: Icon(Icons.info_outline), title: Text('70mai A510 GPS Manager'), subtitle: const Text('Версия приложения: 1.1.0+4')),

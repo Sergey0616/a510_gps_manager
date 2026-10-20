@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'app_logger.dart';
 
 /// Одна запись в листинге FTP.
 class FtpEntry {
@@ -26,23 +27,23 @@ class FtpClient {
   bool _closed = false;
 
   static Future<FtpClient> connect(String host, int port, String username, String password) async {
-    print('[FTP] connect $host:$port');
+    AppLogger.log('[FTP] connect $host:$port');
     final socket = await Socket.connect(host, port, timeout: const Duration(seconds: 12));
     final client = FtpClient(socket, StreamIterator<String>(socket.cast<List<int>>().transform(utf8.decoder).transform(const LineSplitter())));
     final greeting = await client.readResponse();
-    print('[FTP] greeting → ${greeting.code}');
+    AppLogger.log('[FTP] greeting → ${greeting.code}');
     if (greeting.code >= 400) throw SocketException('FTP greeting: ${greeting.text}');
     final user = await client.command('USER $username');
-    print('[FTP] USER → ${user.code}');
+    AppLogger.log('[FTP] USER → ${user.code}');
     if (user.code == 331) {
       final pass = await client.command('PASS $password');
-      print('[FTP] PASS → ${pass.code}');
+      AppLogger.log('[FTP] PASS → ${pass.code}');
       if (pass.code >= 400) throw SocketException('FTP login: ${pass.text}');
     } else if (user.code >= 400) {
       throw SocketException('FTP login: ${user.text}');
     }
     final binary = await client.command('TYPE I');
-    print('[FTP] TYPE I → ${binary.code}');
+    AppLogger.log('[FTP] TYPE I → ${binary.code}');
     if (binary.code >= 400) throw SocketException('FTP TYPE I: ${binary.text}');
     return client;
   }

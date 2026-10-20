@@ -8,6 +8,7 @@ import '../models/gps_point.dart';
 import '../models/track.dart';
 import 'gpx_writer.dart';
 import 'storage_paths.dart';
+import 'app_logger.dart';
 
 /// Локальное хранилище исходных CSV, GPX и сводной таблицы.
 class StorageService {
@@ -74,6 +75,7 @@ class StorageService {
         .cast<File>()
         .toList();
     debug = 'dir=${parsedDirectory.path}; files=${files.length}';
+    AppLogger.log('[Storage] loadTracks: найдено ${files.length} GPX файлов в ${parsedDirectory.path}');
     final tracks = <Track>[];
 
     for (final file in files) {
@@ -192,6 +194,7 @@ class StorageService {
       }
     }
     debug += '; done=${tracks.length}';
+    AppLogger.log('[Storage] loadTracks: успешно загружено ${tracks.length} треков');
     tracks.sort((a, b) => b.startUtc.compareTo(a.startUtc));
     return tracks;
   }

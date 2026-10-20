@@ -1,6 +1,8 @@
 import 'dart:io';
+import 'app_logger.dart';
 
 import 'ftp_client.dart';
+import 'app_logger.dart';
 
 /// Загрузка GPS CSV с FTP-сервера регистратора (совместимо с busybox ftpd).
 class FtpService {
@@ -29,7 +31,7 @@ class FtpService {
       await ftp.list('.');
       return true;
     } catch (e) {
-      print('[FTP] testConnection error: $e');
+      AppLogger.log('[FTP] testConnection error: $e');
       return false;
     } finally {
       await ftp?.close();
@@ -53,7 +55,7 @@ class FtpService {
           .where((e) => !e.isDirectory && RegExp(r'^gps_\d+$').hasMatch(e.name))
           .toList()
         ..sort((a, b) => a.name.compareTo(b.name));
-      print('[FTP] Found ${gpsFiles.length} gps files');
+      AppLogger.log('[FTP] Found ${gpsFiles.length} gps files');
       onProgress?.call(0, gpsFiles.length);
       var done = 0;
       for (final entry in gpsFiles) {
@@ -73,9 +75,9 @@ class FtpService {
           if (await target.exists()) await target.delete();
           await temp.rename(target.path);
           downloaded.add(target);
-          print('[FTP] ${entry.name} → ${await target.length()} байт');
+          AppLogger.log('[FTP] ${entry.name} → ${await target.length()} байт');
         } catch (e) {
-          print('[FTP] download ${entry.name} failed: $e');
+          AppLogger.log('[FTP] download ${entry.name} failed: $e');
           if (await temp.exists()) await temp.delete();
         } finally {
           done++;
@@ -113,7 +115,7 @@ class FtpService {
         } catch (_) {}
       }
     } catch (e) {
-      print('[FTP] deleteEventVideos error: $e');
+      AppLogger.log('[FTP] deleteEventVideos error: $e');
     } finally {
       await ftp?.close();
     }
@@ -131,21 +133,21 @@ class FtpService {
       ftp = await FtpClient.connect(host, port, username, password);
       final cwd = await ftp.command('CWD /mnt/sd');
       if (cwd.code >= 400) {
-        print('[FTP] CWD /mnt/sd → ${cwd.code}: ${cwd.text}');
+        AppLogger.log('[FTP] CWD /mnt/sd → ${cwd.code}: ${cwd.text}');
         return null;
       }
       if (await temp.exists()) await temp.delete();
       await ftp.retrieveFile('GPSData000001.txt', temp);
       if (!await temp.exists() || await temp.length() == 0) {
-        print('[FTP] GPSData000001.txt пустой');
+        AppLogger.log('[FTP] GPSData000001.txt пустой');
         return null;
       }
       if (await target.exists()) await target.delete();
       await temp.rename(target.path);
-      print('[FTP] GPSData000001.txt → ${await target.length()} байт');
+      AppLogger.log('[FTP] GPSData000001.txt → ${await target.length()} байт');
       return target;
     } catch (e) {
-      print('[FTP] downloadGpsDataFile error: $e');
+      AppLogger.log('[FTP] downloadGpsDataFile error: $e');
       if (await temp.exists()) await temp.delete();
       return null;
     } finally {
