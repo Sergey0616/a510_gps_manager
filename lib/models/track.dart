@@ -29,17 +29,19 @@ class Track {
     return distance;
   }
 
-  double get maxSpeedKmh => points.isEmpty
+  late final double maxSpeedKmh = points.isEmpty
       ? 0
       : points.map((point) => point.speedKmh).reduce(math.max);
 
-  double get averageSpeedKmh {
+  late final double averageSpeedKmh = _calculateAverageSpeed();
+
+  double _calculateAverageSpeed() {
     final seconds = duration.inSeconds;
     return seconds <= 0 ? 0 : distanceKm * 3600 / seconds;
   }
 
   /// Уникальные имена MP4-файлов, связанных с точками трека.
-  Set<String> get videoNames => points
+  late final Set<String> videoNames = points
       .where((p) => p.videoName != null && p.videoName!.isNotEmpty)
       .map((p) => p.videoName!)
       .toSet();
