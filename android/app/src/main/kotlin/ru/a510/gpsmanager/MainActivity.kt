@@ -3,6 +3,8 @@ package ru.a510.gpsmanager
 import android.content.Context
 import android.net.wifi.WifiManager
 import android.os.StatFs
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -11,11 +13,32 @@ class MainActivity : FlutterActivity() {
     private val channelName = "ru.a510.gpsmanager/wifi"
     private val storageChannelName = "ru.a510.gpsmanager/storage"
 
+    private fun bindToWifi(): Boolean {
+        val cm = applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        for (network in cm.allNetworks) {
+            val caps = cm.getNetworkCapabilities(network)
+            if (caps != null && caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
+                return cm.bindProcessToNetwork(network)
+            }
+        }
+        return false
+    }
+
+    private fun unbindWifi() {
+        val cm = applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        cm.bindProcessToNetwork(null)
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, channelName)
             .setMethodCallHandler { call, result ->
-                if (call.method == "getWifiIp") {
+                if (call.method == "bindToWifi") {
+                    result.success(bindToWifi())
+                } else if (call.method == "unbindWifi") {
+                    unbindWifi()
+                    result.success(true)
+                } else if (call.method == "getWifiIp") {
                     try {
                         val manager = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
                         val ip = manager.connectionInfo?.ipAddress

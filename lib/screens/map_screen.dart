@@ -51,8 +51,18 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         });
       }
     });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) context.read<TracksProvider>().reloadFromDisk();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      await context.read<TracksProvider>().reloadFromDisk();
+      if (!mounted) return;
+      
+      if (widget.initialTrackId != null) {
+        final provider = context.read<TracksProvider>();
+        try {
+          final track = provider.tracks.firstWhere((t) => t.id == widget.initialTrackId);
+          _showTrack(track);
+        } catch (_) {}
+      }
     });
   }
 
@@ -96,13 +106,21 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     final polylines = <Polyline>[];
     final markers = <Marker>[];
 
-    for (var i = 0; i < tracks.length; i++) {
-      final track = tracks[i];
+    // Если трек выбран — рисуем только его. Если нет — рисуем все.
+    final displayTracks = _selectedTrack != null ? [_selectedTrack!] : tracks;
+
+    for (var i = 0; i < displayTracks.length; i++) {
+      final track = displayTracks[i];
       final color = _colors[i % _colors.length];
       final positions = track.points.map((point) => point.position).toList();
+      
       if (positions.length >= 2) polylines.add(Polyline(points: positions, color: color, strokeWidth: 4));
-      markers.add(Marker(point: positions.first, width: 36, height: 36, child: GestureDetector(onTap: () => _showTrack(track), child: const Icon(Icons.trip_origin, color: Colors.green, size: 28))));
-      markers.add(Marker(point: positions.last, width: 36, height: 36, child: GestureDetector(onTap: () => _showTrack(track), child: const Icon(Icons.location_on, color: Colors.red, size: 30))));
+      
+      // Показываем маркеры только если трек не выбран (чтобы не засорять карту)
+      if (_selectedTrack == null) {
+        markers.add(Marker(point: positions.first, width: 36, height: 36, child: GestureDetector(onTap: () => _showTrack(track), child: const Icon(Icons.trip_origin, color: Colors.green, size: 28))));
+        markers.add(Marker(point: positions.last, width: 36, height: 36, child: GestureDetector(onTap: () => _showTrack(track), child: const Icon(Icons.location_on, color: Colors.red, size: 30))));
+      }
     }
 
     return Scaffold(
@@ -142,12 +160,11 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
           ),
           children: [
             TileLayer(urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', userAgentPackageName: 'ru.a510.gpsmanager'),
-            PolylineLayer(polylines: _selectedTrack != null ? [Polyline(points: _selectedTrack!.points.map((p) => p.position).toList(), strokeWidth: 4.0, color: Colors.blue)] : polylines),
+            PolylineLayer(polylines: polylines),
             MarkerLayer(
               markers: _selectedTrack != null
                   ? [
-                      Marker(point: _selectedTrack!.points.first.position, width: 36, height: 36, child: const Icon(Icons.trip_origin, color: Colors.green, size: 28)),
-                      Marker(point: _selectedTrack!.points.last.position, width: 36, height: 36, child: const Icon(Icons.location_on, color: Colors.red, size: 30)),
+                      ...markers,
                       if (_currentAnimatedPos != null)
                         Marker(
                           point: _currentAnimatedPos!,
@@ -216,6 +233,18 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
           Positioned(left: 12, right: 76, bottom: 20, child: Card(child: ListTile(
             title: Text(DateFormat('dd.MM.yyyy HH:mm').format(_selectedTrack!.startLocal)),
             subtitle: Text('${_selectedTrack!.distanceKm.toStringAsFixed(2)} км · макс. ${_selectedTrack!.maxSpeedKmh.toStringAsFixed(0)} км/ч'),
+            leading: IconButton(
+              icon: const Icon(Icons.play_circle, color: Colors.blue, size: 30),
+              onPressed: () {
+                final videos = _selectedTrack!.videoNames.toList();
+                if (videos.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Для этого трека нет видео')));
+                } else {
+                  Navigator.of(context).pushNamed('/video', arguments: videos.first);
+                }
+              },
+              tooltip: 'Смотреть видео',
+            ),
             trailing: IconButton(
               icon: const Icon(Icons.close),
               onPressed: () => setState(() {

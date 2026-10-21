@@ -255,6 +255,11 @@ Future<void> syncFromLocalFolder() async {
   if (!await parsedDir.exists()) {
     await parsedDir.create(recursive: true);
   }
+  // Очищаем старые GPX файлы, чтобы не смешивать с новыми
+  final oldFiles = parsedDir.listSync().whereType<File>().where((f) => f.path.endsWith('.gpx'));
+  for (final f in oldFiles) {
+    try { await f.delete(); } catch (_) {}
+  }
   for (final f in gpxFiles) {
     final name = f.path.split('/').last;
     final target = File('${parsedDir.path}/$name');
