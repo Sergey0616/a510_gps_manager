@@ -43,7 +43,8 @@ class LocalFolderService {
     for (final file in files) {
       try {
         final name = file.path.split('/').last;
-        await saf.pasteLocalFile(file.path, safDirUri, destName: name);
+        final bytes = await file.readAsBytes();
+        await saf.writeFileBytes(safDirUri, name, 'application/gpx+xml', bytes);
       } catch (e) {
         print('[SAF] Ошибка сохранения \${file.path}: \$e');
       }

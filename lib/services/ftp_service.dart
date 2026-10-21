@@ -2,7 +2,6 @@ import 'dart:io';
 import 'app_logger.dart';
 
 import 'ftp_client.dart';
-import 'app_logger.dart';
 
 /// Загрузка GPS CSV с FTP-сервера регистратора (совместимо с busybox ftpd).
 class FtpService {
