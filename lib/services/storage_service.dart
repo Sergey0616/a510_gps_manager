@@ -78,9 +78,11 @@ class StorageService {
     AppLogger.log('[Storage] loadTracks: найдено ${files.length} GPX файлов в ${parsedDirectory.path}');
     final tracks = <Track>[];
 
-    for (final file in files) {
+    for (var i = 0; i < files.length; i++) {
+      final file = files[i];
       try {
-        await Future.delayed(Duration.zero);
+        // Даем UI-потоку отрисовать кадр, чтобы приложение не зависало
+        await Future.delayed(const Duration(milliseconds: 10));
         var content = await file.readAsString();
         debug += '\n${file.path.split('/').last}: ${content.length}b';
         // Удаляем BOM и обрезаем пробелы — иначе XmlDocument.parse может упасть.
