@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:path_provider/path_provider.dart';
 import 'package:saf/saf.dart';
+import 'app_logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class LocalFolderService {
@@ -40,13 +41,15 @@ class LocalFolderService {
   /// во временную директорию и возвращает список File.
   static Future<void> saveFilesToSaf(String safDirUri, List<File> files) async {
     final saf = Saf();
+    AppLogger.log('[SAF] Начинаем сохранение \${files.length} файлов в папку');
     for (final file in files) {
       try {
         final name = file.path.split('/').last;
         final bytes = await file.readAsBytes();
-        await saf.writeFileBytes(safDirUri, name, 'application/gpx+xml', bytes);
+        await saf.writeFileBytes(safDirUri, name, 'application/octet-stream', bytes);
+        AppLogger.log('[SAF] Успешно сохранен: \$name');
       } catch (e) {
-        print('[SAF] Ошибка сохранения \${file.path}: \$e');
+        AppLogger.log('[SAF] Ошибка сохранения \${file.path}: \$e');
       }
     }
   }
