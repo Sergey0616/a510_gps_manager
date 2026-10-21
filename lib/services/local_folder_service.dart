@@ -38,6 +38,18 @@ class LocalFolderService {
   }
   /// Рекурсивно собирает все .gpx из выбранной SAF-папки
   /// во временную директорию и возвращает список File.
+  static Future<void> saveFilesToSaf(String safDirUri, List<File> files) async {
+    final saf = Saf();
+    for (final file in files) {
+      try {
+        final name = file.path.split('/').last;
+        await saf.pasteLocalFile(file.path, safDirUri, destName: name);
+      } catch (e) {
+        print('[SAF] Ошибка сохранения \${file.path}: \$e');
+      }
+    }
+  }
+
   static Future<List<File>> extractGpxRecursive(String uri) async {
     final saf = Saf();
     final temp = await getTemporaryDirectory();
