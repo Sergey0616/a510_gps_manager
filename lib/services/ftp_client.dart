@@ -26,9 +26,9 @@ class FtpClient {
   final StreamIterator<String> _lines;
   bool _closed = false;
 
-  static Future<FtpClient> connect(String host, int port, String username, String password, {InternetAddress? sourceAddress}) async {
+  static Future<FtpClient> connect(String host, int port, String username, String password) async {
     AppLogger.log('[FTP] connect $host:$port');
-    final socket = await Socket.connect(host, port, timeout: const Duration(seconds: 12), sourceAddress: sourceAddress);
+    final socket = await Socket.connect(host, port, timeout: const Duration(seconds: 12));
     final client = FtpClient(socket, StreamIterator<String>(socket.cast<List<int>>().transform(utf8.decoder).transform(const LineSplitter())));
     final greeting = await client.readResponse();
     AppLogger.log('[FTP] greeting → ${greeting.code}');
@@ -85,7 +85,7 @@ class FtpClient {
     final ip = match.group(1)!.replaceAll(',', '.');
     final dataPort = int.parse(match.group(2)!) * 256 + int.parse(match.group(3)!);
     final address = InternetAddress.tryParse(ip) ?? _control.address;
-    return Socket.connect(address, dataPort, timeout: const Duration(seconds: 12), sourceAddress: _control.address);
+    return Socket.connect(address, dataPort, timeout: const Duration(seconds: 12));
   }
 
   Future<List<FtpEntry>> list(String path) async {
