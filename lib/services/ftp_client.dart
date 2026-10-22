@@ -28,7 +28,18 @@ class FtpClient {
 
   static Future<FtpClient> connect(String host, int port, String username, String password) async {
     AppLogger.log('[FTP] connect $host:$port');
-    final socket = await Socket.connect(host, port, timeout: const Duration(seconds: 12));
+    Socket? socket;
+    for (var attempt = 1; attempt <= 3; attempt++) {
+      try {
+        print('[FTP] connect $host:$port (попытка $attempt)');
+        socket = await Socket.connect(host, port, timeout: const Duration(seconds: 5));
+        break;
+      } catch (e) {
+        if (attempt == 3) rethrow;
+        await Future.delayed(const Duration(seconds: 2));
+      }
+    }
+    if (socket == null) throw Exception('Не удалось подключиться к FTP');
     final client = FtpClient(socket, StreamIterator<String>(socket.cast<List<int>>().transform(utf8.decoder).transform(const LineSplitter())));
     final greeting = await client.readResponse();
     AppLogger.log('[FTP] greeting → ${greeting.code}');

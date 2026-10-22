@@ -179,10 +179,10 @@ class StorageService {
             points: points,
             gpxPath: file.path,
           );
-          final hasVideo = candidate.points.any((p) => p.videoName != null);
+          // Фильтр: только треки от 100 метров
           final hasMovement = candidate.points.length >= 2 &&
-              candidate.distanceKm >= 0.05;
-          if (hasMovement || hasVideo) {
+              candidate.distanceKm >= 0.1;
+          if (hasMovement) {
             tracks.add(candidate);
             debug += '; +track';
           } else {

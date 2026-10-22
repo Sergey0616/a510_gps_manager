@@ -216,6 +216,21 @@ Future<void> syncViaFtp() async {
   }
 
   await storage.saveTracks(allTracks);
+  
+  // Копируем новые GPX в выбранную SAF-папку
+  final safUri = await LocalFolderService.getFolderUri();
+  AppLogger.log('[SAF] Проверка папки при FTP: safUri = $safUri');
+  if (safUri != null && safUri.isNotEmpty) {
+    _status = 'Сохранение треков в локальную папку…';
+    notifyListeners();
+    try {
+      final files = await storage.parsedDirectory.list().where((e) => e is File && e.path.endsWith('.gpx')).cast<File>().toList();
+      await LocalFolderService.saveFilesToSaf(safUri, files);
+    } catch (e) {
+      AppLogger.log('[SAF] Ошибка при сохранении в папку: $e');
+    }
+  }
+
   _tracks = await storage.loadTracks();
   _sortTracks();
   _lastSync = DateTime.now();
