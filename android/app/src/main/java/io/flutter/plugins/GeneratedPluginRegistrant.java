@@ -90,5 +90,10 @@ public final class GeneratedPluginRegistrant {
     } catch (Exception e) {
       Log.e(TAG, "Error registering plugin wakelock_plus, dev.fluttercommunity.plus.wakelock.WakelockPlusPlugin", e);
     }
+    try {
+      flutterEngine.getPlugins().add(new com.alternadom.wifiiot.WifiIotPlugin());
+    } catch (Exception e) {
+      Log.e(TAG, "Error registering plugin wifi_iot, com.alternadom.wifiiot.WifiIotPlugin", e);
+    }
   }
 }
