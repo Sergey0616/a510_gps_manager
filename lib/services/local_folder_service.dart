@@ -39,17 +39,19 @@ class LocalFolderService {
   }
   /// Рекурсивно собирает все .gpx из выбранной SAF-папки
   /// во временную директорию и возвращает список File.
-  static Future<void> saveFilesToSaf(String safDirUri, List<File> files) async {
+  static Future<void> saveFilesToSaf(String safDirUri, List<File> files, {void Function(int, int)? onProgress}) async {
     final saf = Saf();
-    AppLogger.log('[SAF] Начинаем сохранение \${files.length} файлов в папку');
-    for (final file in files) {
+    AppLogger.log('[SAF] Начинаем сохранение ${files.length} файлов в папку');
+    for (var i = 0; i < files.length; i++) {
+      final file = files[i];
       try {
         final name = file.path.split('/').last;
         final bytes = await file.readAsBytes();
         await saf.writeFileBytes(safDirUri, name, 'application/octet-stream', bytes);
-        AppLogger.log('[SAF] Успешно сохранен: \$name');
+        AppLogger.log('[SAF] Успешно сохранен: $name');
+        onProgress?.call(i + 1, files.length);
       } catch (e) {
-        AppLogger.log('[SAF] Ошибка сохранения \${file.path}: \$e');
+        AppLogger.log('[SAF] Ошибка сохранения ${file.path}: $e');
       }
     }
   }

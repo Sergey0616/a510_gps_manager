@@ -225,7 +225,10 @@ Future<void> syncViaFtp() async {
     notifyListeners();
     try {
       final files = await storage.parsedDirectory.list().where((e) => e is File && e.path.endsWith('.gpx')).cast<File>().toList();
-      await LocalFolderService.saveFilesToSaf(safUri, files);
+      await LocalFolderService.saveFilesToSaf(safUri, files, onProgress: (done, total) {
+        _status = 'Сохранение в папку: $done из $total';
+        notifyListeners();
+      });
     } catch (e) {
       AppLogger.log('[SAF] Ошибка при сохранении в папку: $e');
     }

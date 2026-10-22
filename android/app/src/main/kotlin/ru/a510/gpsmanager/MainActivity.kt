@@ -10,16 +10,25 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
+    private var wifiNetwork: android.net.Network? = null
+    private val networkCallback = object : android.net.ConnectivityManager.NetworkCallback() {
+        override fun onAvailable(network: android.net.Network) {
+            wifiNetwork = network
+        }
+        override fun onLost(network: android.net.Network) {
+            if (wifiNetwork == network) wifiNetwork = null
+        }
+    }
+
     private val channelName = "ru.a510.gpsmanager/wifi"
     private val storageChannelName = "ru.a510.gpsmanager/storage"
 
     private fun bindToWifi(): Boolean {
-        val cm = applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        for (network in cm.allNetworks) {
-            val caps = cm.getNetworkCapabilities(network)
-            if (caps != null && caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
-                return cm.bindProcessToNetwork(network)
-            }
+        val cm = applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
+        val network = wifiNetwork ?: cm.activeNetwork
+        val caps = cm.getNetworkCapabilities(network)
+        if (caps != null && caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI)) {
+            return cm.bindProcessToNetwork(network)
         }
         return false
     }
@@ -31,6 +40,11 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        val cm = applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
+        val request = android.net.NetworkRequest.Builder()
+            .addTransportType(android.net.NetworkCapabilities.TRANSPORT_WIFI)
+            .build()
+        cm.registerNetworkCallback(request, networkCallback)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, channelName)
             .setMethodCallHandler { call, result ->
                 if (call.method == "bindToWifi") {
