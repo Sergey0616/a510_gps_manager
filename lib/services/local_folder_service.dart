@@ -39,21 +39,33 @@ class LocalFolderService {
   }
   /// Рекурсивно собирает все .gpx из выбранной SAF-папки
   /// во временную директорию и возвращает список File.
-  static Future<void> saveFilesToSaf(String safDirUri, List<File> files, {void Function(int, int)? onProgress}) async {
+  static Future<void> saveFilesToSaf(String safDirUri, List<File> files, {String subfolder = 'gps', void Function(int, int)? onProgress}) async {
     final saf = Saf();
-    AppLogger.log('[SAF] Начинаем сохранение ${files.length} файлов в папку');
+    AppLogger.log('[SAF] Начинаем сохранение ${files.length} файлов в подпапку $subfolder');
+    
+    String targetUri = safDirUri;
+    try {
+      final targetDir = await saf.mkdirp(safDirUri, [subfolder]);
+      targetUri = targetDir.uri;
+      AppLogger.log('[SAF] Создана/открыта подпапка: $targetUri');
+    } catch (e) {
+      AppLogger.log('[SAF] Ошибка создания подпапки: $e');
+    }
+
     for (var i = 0; i < files.length; i++) {
       final file = files[i];
       try {
         final name = file.path.split('/').last;
         final bytes = await file.readAsBytes();
-        await saf.writeFileBytes(safDirUri, name, 'application/octet-stream', bytes);
+        await saf.writeFileBytes(targetUri, name, 'application/octet-stream', bytes);
         AppLogger.log('[SAF] Успешно сохранен: $name');
         onProgress?.call(i + 1, files.length);
+        await Future.delayed(const Duration(milliseconds: 10));
       } catch (e) {
         AppLogger.log('[SAF] Ошибка сохранения ${file.path}: $e');
       }
     }
+    AppLogger.log('[SAF] Завершено сохранение всех файлов');
   }
 
   static Future<List<File>> extractGpxRecursive(String uri) async {

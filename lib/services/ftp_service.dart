@@ -13,7 +13,10 @@ class FtpService {
     required this.password,
     this.port = 21,
     this.remoteDirectory = '/mnt/other/4g_gps',
+    this.sourceAddress,
   });
+
+  final InternetAddress? sourceAddress;
 
 
   final String host;
@@ -25,7 +28,7 @@ class FtpService {
   Future<bool> testConnection() async {
     FtpClient? ftp;
     try {
-      ftp = await FtpClient.connect(host, port, username, password);
+      ftp = await FtpClient.connect(host, port, username, password, sourceAddress: sourceAddress);
       final cwd = await ftp.command('CWD $remoteDirectory');
       if (cwd.code >= 400) return false;
       await ftp.list('.');
@@ -44,7 +47,7 @@ class FtpService {
   }) async {
     await destination.create(recursive: true);
     final downloaded = <File>[];
-    final ftp = await FtpClient.connect(host, port, username, password);
+    final ftp = await FtpClient.connect(host, port, username, password, sourceAddress: sourceAddress);
     try {
       final cwd = await ftp.command('CWD $remoteDirectory');
       if (cwd.code >= 400) {
@@ -95,7 +98,7 @@ class FtpService {
     FtpClient? ftp;
     int deleted = 0;
     try {
-      ftp = await FtpClient.connect(host, port, username, password);
+      ftp = await FtpClient.connect(host, port, username, password, sourceAddress: sourceAddress);
       final paths = ['/mnt/sd/Event', '/mnt/sd/events', '/mnt/sd/DCIM/Event', '/mnt/sd/DCIM/events'];
       bool found = false;
       for (final path in paths) {
@@ -130,7 +133,7 @@ class FtpService {
     final temp = File('${destination.path}/GPSData000001.txt.part');
     FtpClient? ftp;
     try {
-      ftp = await FtpClient.connect(host, port, username, password);
+      ftp = await FtpClient.connect(host, port, username, password, sourceAddress: sourceAddress);
       final cwd = await ftp.command('CWD /mnt/sd');
       if (cwd.code >= 400) {
         AppLogger.log('[FTP] CWD /mnt/sd → ${cwd.code}: ${cwd.text}');

@@ -10,7 +10,7 @@ android {
     ndkVersion "27.0.12077973"
 
     defaultConfig {
-        applicationId "ru.a510.gpsmanager"
+        applicationId "ru.a510.gpsmanager.v2"
         minSdk 24
         targetSdk flutter.targetSdkVersion
         versionCode 1000 + (System.getenv("GITHUB_RUN_NUMBER")?.toInteger() ?: 1)

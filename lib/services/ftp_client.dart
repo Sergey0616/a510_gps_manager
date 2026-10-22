@@ -21,18 +21,19 @@ class FtpResponse {
 /// Минимальный FTP-клиент на Socket.
 /// Совместим с busybox ftpd (70mai A510): только USER/PASS/TYPE/CWD/PASV/LIST/RETR/QUIT.
 class FtpClient {
-  FtpClient(this._control, this._lines);
+  FtpClient(this._control, this._lines, this._sourceAddress);
   final Socket _control;
   final StreamIterator<String> _lines;
+  final InternetAddress? _sourceAddress;
   bool _closed = false;
 
-  static Future<FtpClient> connect(String host, int port, String username, String password) async {
+  static Future<FtpClient> connect(String host, int port, String username, String password, {InternetAddress? sourceAddress}) async {
     AppLogger.log('[FTP] connect $host:$port');
     Socket? socket;
     for (var attempt = 1; attempt <= 3; attempt++) {
       try {
         print('[FTP] connect $host:$port (попытка $attempt)');
-        socket = await Socket.connect(host, port, timeout: const Duration(seconds: 5));
+        socket = await Socket.connect(host, port, timeout: const Duration(seconds: 5), sourceAddress: sourceAddress);
         break;
       } catch (e) {
         if (attempt == 3) rethrow;
@@ -40,7 +41,7 @@ class FtpClient {
       }
     }
     if (socket == null) throw Exception('Не удалось подключиться к FTP');
-    final client = FtpClient(socket, StreamIterator<String>(socket.cast<List<int>>().transform(utf8.decoder).transform(const LineSplitter())));
+    final client = FtpClient(socket, StreamIterator<String>(socket.cast<List<int>>().transform(utf8.decoder).transform(const LineSplitter())), sourceAddress);
     final greeting = await client.readResponse();
     AppLogger.log('[FTP] greeting → ${greeting.code}');
     if (greeting.code >= 400) throw SocketException('FTP greeting: ${greeting.text}');
@@ -96,7 +97,7 @@ class FtpClient {
     final ip = match.group(1)!.replaceAll(',', '.');
     final dataPort = int.parse(match.group(2)!) * 256 + int.parse(match.group(3)!);
     final address = InternetAddress.tryParse(ip) ?? _control.address;
-    return Socket.connect(address, dataPort, timeout: const Duration(seconds: 12));
+    return Socket.connect(address, dataPort, timeout: const Duration(seconds: 12), sourceAddress: _sourceAddress);
   }
 
   Future<List<FtpEntry>> list(String path) async {
