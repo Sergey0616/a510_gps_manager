@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
@@ -26,6 +28,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   late final Player _player;
   late final VideoController _controller;
   String? _error;
+  bool _isPlaying = false;
+  double _speed = 1.0;
+  StreamSubscription<bool>? _playingSub;
+
+  static const List<double> _speeds = [0.5, 1.0, 2.0, 4.0];
 
   @override
   void initState() {
@@ -33,12 +40,16 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     _player = Player();
     _controller = VideoController(_player);
+    _playingSub = _player.stream.playing.listen((playing) {
+      if (mounted) setState(() => _isPlaying = playing);
+    });
     _open();
   }
 
   Future<void> _open() async {
     try {
       await _player.open(Media(widget.path));
+      await _player.setRate(_speed);
       final start = widget.startPosition;
       if (start != null && start > Duration.zero) {
         // Ждём, пока плеер загрузит файл, потом переходим к нужной секунде.
@@ -53,8 +64,18 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     }
   }
 
+  void _togglePlay() {
+    _player.playOrPause();
+  }
+
+  void _setSpeed(double s) {
+    setState(() => _speed = s);
+    _player.setRate(s);
+  }
+
   @override
   void dispose() {
+    _playingSub?.cancel();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     _player.dispose();
     super.dispose();
@@ -73,16 +94,102 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                 final result = await OpenFilex.open(widget.path, type: 'video/mp4');
                 if (!context.mounted) return;
                 if (result.type != ResultType.done) {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Не удалось открыть файл: ${result.message}')));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Не удалось открыть файл: ${result.message}')),
+                  );
                 }
               },
             ),
           ],
         ),
-        body: Center(
-          child: _error != null
-              ? Padding(padding: const EdgeInsets.all(24), child: Text('Ошибка воспроизведения: $_error', style: const TextStyle(color: Colors.white)))
-              : Video(controller: _controller, controls: MaterialVideoControls),
+        body: _error != null
+            ? Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(
+                  'Ошибка воспроизведения: $_error',
+                  style: const TextStyle(color: Colors.white),
+                ),
+              )
+            : Column(
+                children: [
+                  Expanded(
+                    child: Video(
+                      controller: _controller,
+                      controls: MaterialVideoControls,
+                    ),
+                  ),
+                  _BottomBar(
+                    isPlaying: _isPlaying,
+                    speed: _speed,
+                    speeds: _speeds,
+                    onTogglePlay: _togglePlay,
+                    onSpeedChanged: _setSpeed,
+                  ),
+                ],
+              ),
+      );
+}
+
+class _BottomBar extends StatelessWidget {
+  const _BottomBar({
+    required this.isPlaying,
+    required this.speed,
+    required this.speeds,
+    required this.onTogglePlay,
+    required this.onSpeedChanged,
+  });
+
+  final bool isPlaying;
+  final double speed;
+  final List<double> speeds;
+  final VoidCallback onTogglePlay;
+  final ValueChanged<double> onSpeedChanged;
+
+  String _label(double s) => '${s}x'.replaceAll('.0x', 'x');
+
+  @override
+  Widget build(BuildContext context) => SafeArea(
+        top: false,
+        child: Container(
+          color: Colors.black87,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          child: Row(
+            children: [
+              IconButton(
+                iconSize: 32,
+                color: Colors.white,
+                tooltip: isPlaying ? 'Пауза' : 'Играть',
+                icon: Icon(
+                  isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
+                ),
+                onPressed: onTogglePlay,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: speeds
+                        .map(
+                          (s) => Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            child: ChoiceChip(
+                              label: Text(_label(s)),
+                              selected: (s - speed).abs() < 0.01,
+                              onSelected: (_) => onSpeedChanged(s),
+                              showCheckmark: false,
+                              labelStyle: const TextStyle(color: Colors.white),
+                              selectedColor: Theme.of(context).colorScheme.primary,
+                              backgroundColor: Colors.grey.shade800,
+                            ),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       );
 }
