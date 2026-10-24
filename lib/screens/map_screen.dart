@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -6,6 +7,10 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../providers/tracks_provider.dart';
 import '../models/track.dart';
+import '../models/gps_point.dart';
+import '../models/video_file.dart';
+import '../services/storage_paths.dart';
+import 'video_player_screen.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key, this.initialTrackId});
@@ -174,6 +179,18 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       appBar: AppBar(
         title: const Text('Карта треков'),
         actions: [
+          IconButton(
+            tooltip: 'Live-трансляция (RTSP)',
+            icon: const Icon(Icons.videocam),
+            onPressed: () {
+              Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => const VideoPlayerScreen(
+                  path: 'rtsp://192.168.0.1/liveRTSP/av4',
+                  title: 'Live-трансляция',
+                ),
+              ));
+            },
+          ),
           IconButton(
             tooltip: 'Обновить локальные треки',
             icon: const Icon(Icons.refresh),
@@ -353,7 +370,75 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     );
   }
 
-  void _handleLongPress(LatLng tapPoint, List<Track> tracks) {
-    // Заглушка для видео (если нужно, оставьте вашу логику)
+  void _handleLongPress(LatLng tapPoint, List<Track> tracks) async {
+    GpsPoint? nearest;
+    double minDistance = double.infinity;
+
+    for (var track in tracks) {
+      for (var p in track.points) {
+        final dLat = (p.latitude - tapPoint.latitude) * 111320;
+        final dLon = (p.longitude - tapPoint.longitude) * 111320 * math.cos(tapPoint.latitude * math.pi / 180);
+        final dist = math.sqrt(dLat * dLat + dLon * dLon);
+        if (dist < minDistance) {
+          minDistance = dist;
+          nearest = p;
+        }
+      }
+    }
+
+    if (nearest == null || minDistance > 150) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Рядом нет точек трека (ближе 150 м)')));
+      return;
+    }
+
+    final videoName = nearest.videoName;
+    if (videoName == null || videoName.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('К этой точке не привязано видео')));
+      return;
+    }
+
+    final videoTime = VideoFile.parseDateFromName(videoName);
+    if (videoTime == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Не удалось распознать время файла')));
+      return;
+    }
+
+    var startPos = nearest.timeUtc.difference(videoTime.toUtc());
+    if (startPos.isNegative) startPos = Duration.zero;
+
+    String? localPath;
+    final base = await StoragePaths.baseDir();
+    String category = 'Normal';
+    String camera = videoName.toUpperCase().contains('R.MP4') ? 'Back' : 'Front';
+
+    for (final cat in ['Normal', 'Parking', 'Event', 'Lapse']) {
+      for (final cam in ['Front', 'Back', 'Rear']) {
+        final f = File('${base.path}/video/$cat/$cam/$videoName');
+        if (await f.exists()) {
+          localPath = f.path;
+          category = cat;
+          camera = cam;
+          break;
+        }
+      }
+      if (localPath != null) break;
+    }
+
+    final String playPath = localPath ?? 'http://192.168.0.1/mnt/sd/$category/$camera/$videoName';
+    final bool isLocal = localPath != null;
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(isLocal ? 'Открываем локальное видео с ${startPos.inSeconds} сек.' : 'Открываем онлайн с ${startPos.inSeconds} сек.'),
+      duration: const Duration(seconds: 2),
+    ));
+
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => VideoPlayerScreen(
+        path: playPath,
+        title: videoName,
+        startPosition: startPos,
+      ),
+    ));
   }
 }
