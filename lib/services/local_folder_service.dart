@@ -52,10 +52,21 @@ class LocalFolderService {
       AppLogger.log('[SAF] Ошибка создания подпапки: $e');
     }
 
+    final existingFiles = <String>{};
+    try {
+      await for (final entry in saf.walk(targetUri)) {
+        if (!entry.file.isDir) existingFiles.add(entry.file.name);
+      }
+    } catch (_) {}
+
     for (var i = 0; i < files.length; i++) {
       final file = files[i];
+      final name = file.path.split('/').last;
+      if (existingFiles.contains(name)) {
+        onProgress?.call(i + 1, files.length);
+        continue; // Пропускаем уже сохраненные
+      }
       try {
-        final name = file.path.split('/').last;
         final bytes = await file.readAsBytes();
         await saf.writeFileBytes(targetUri, name, 'application/octet-stream', bytes);
         AppLogger.log('[SAF] Успешно сохранен: $name');

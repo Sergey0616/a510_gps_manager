@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
@@ -196,10 +197,30 @@ class _VideoScreenState extends State<VideoScreen> with SingleTickerProviderStat
                         Text('${progress.total > 0 ? (progress.received * 100 / progress.total).toStringAsFixed(1) : '…'}% · ${_formatBytes(progress.received)} · ${_formatBytes(progress.speed.round())}/с · ${progress.remaining == null ? 'осталось —' : 'осталось ${progress.remaining!.inMinutes} мин ${progress.remaining!.inSeconds % 60} с'}'),
                       ],
                     ]),
-                    trailing: IconButton(
-                      tooltip: file.isDownloaded ? 'Воспроизвести' : 'Скачать и воспроизвести',
-                      onPressed: _downloading ? null : () => _downloadOne(file),
-                      icon: Icon(file.isDownloaded ? (file.isPhoto ? Icons.photo : Icons.play_circle) : Icons.download),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          tooltip: 'Смотреть онлайн (HTTP)',
+                          onPressed: () async {
+                            final provider = context.read<TracksProvider>();
+                            try {
+                              await const MethodChannel('ru.a510.gpsmanager/wifi').invokeMethod('bindToWifi');
+                            } catch (_) {}
+                            if (!mounted) return;
+                            final url = 'http://${provider.host}${file.remotePath}';
+                            Navigator.of(context).push(MaterialPageRoute<void>(
+                              builder: (_) => VideoPlayerScreen(path: url, title: '${file.name} (Online)'),
+                            ));
+                          },
+                          icon: const Icon(Icons.cloud_queue, color: Colors.blue),
+                        ),
+                        IconButton(
+                          tooltip: file.isDownloaded ? 'Воспроизвести' : 'Скачать и воспроизвести',
+                          onPressed: _downloading ? null : () => _downloadOne(file),
+                          icon: Icon(file.isDownloaded ? (file.isPhoto ? Icons.photo : Icons.play_circle) : Icons.download),
+                        ),
+                      ],
                     ),
                   );
                 })),

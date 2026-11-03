@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../providers/tracks_provider.dart';
 import '../models/track.dart';
+import '../services/app_logger.dart';
 import '../models/gps_point.dart';
 import '../models/video_file.dart';
 import '../services/storage_paths.dart';
@@ -371,6 +372,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   }
 
   void _handleLongPress(LatLng tapPoint, List<Track> tracks) async {
+    try {
     GpsPoint? nearest;
     double minDistance = double.infinity;
 
@@ -440,5 +442,9 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         startPosition: startPos,
       ),
     ));
+    } catch (e, st) {
+      AppLogger.log('[LongPress] Ошибка: $e\n$st');
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+    }
   }
 }
