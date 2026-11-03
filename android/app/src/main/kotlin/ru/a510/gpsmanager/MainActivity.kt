@@ -25,12 +25,17 @@ class MainActivity : FlutterActivity() {
 
     private fun bindToWifi(): Boolean {
         val cm = applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
-        val network = wifiNetwork ?: cm.activeNetwork
-        val caps = cm.getNetworkCapabilities(network)
-        if (caps != null && caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI)) {
-            return cm.bindProcessToNetwork(network)
+        var wifiNet = wifiNetwork
+        if (wifiNet == null) {
+            for (net in cm.allNetworks) {
+                val caps = cm.getNetworkCapabilities(net)
+                if (caps != null && caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI)) {
+                    wifiNet = net
+                    break
+                }
+            }
         }
-        return false
+        return if (wifiNet != null) cm.bindProcessToNetwork(wifiNet) else false
     }
 
     private fun unbindWifi() {

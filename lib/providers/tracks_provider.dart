@@ -208,6 +208,8 @@ class TracksProvider extends ChangeNotifier {
       uniquePoints[key] = p;
     }
     
+    final dates = uniquePoints.values.map((p) => p.timeUtc.toString().substring(0, 10)).toSet();
+    AppLogger.log('[Sync] Найденные даты в точках: $dates');
     AppLogger.log('[Sync] GPSData: ${gpsDataTracks.length}, '
         'fresh: ${freshTracks.length}, merged points: ${uniquePoints.length}');
 

@@ -221,7 +221,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
             initialCenter: startTrack.points.first.position,
             initialZoom: 13,
             onTap: (_, __) => setState(() => _selectedTrack = null),
-            onLongPress: (_, tapPoint) => _handleLongPress(tapPoint, tracks),
+            onLongPress: (_, tapPoint) => _handleLongPress(tapPoint, _selectedTrack),
           ),
           children: [
             TileLayer(urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', userAgentPackageName: 'ru.a510.gpsmanager'),
@@ -371,21 +371,23 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     );
   }
 
-  void _handleLongPress(LatLng tapPoint, List<Track> tracks) async {
+  void _handleLongPress(LatLng tapPoint, Track? selectedTrack) async {
     try {
+      if (selectedTrack == null) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Сначала нажмите на трек, чтобы изолировать его')));
+        return;
+      }
     GpsPoint? nearest;
     double minDistance = double.infinity;
 
-    for (var track in tracks) {
-      for (var p in track.points) {
+    for (var p in selectedTrack.points) {
         final dLat = (p.latitude - tapPoint.latitude) * 111320;
         final dLon = (p.longitude - tapPoint.longitude) * 111320 * math.cos(tapPoint.latitude * math.pi / 180);
         final dist = math.sqrt(dLat * dLat + dLon * dLon);
         if (dist < minDistance) {
           minDistance = dist;
           nearest = p;
-        }
-      }
+    }
     }
 
     if (nearest == null || minDistance > 150) {

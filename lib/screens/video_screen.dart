@@ -209,6 +209,10 @@ class _VideoScreenState extends State<VideoScreen> with SingleTickerProviderStat
                             } catch (_) {}
                             if (!mounted) return;
                             final url = 'http://${provider.host}${file.remotePath}';
+                            if (file.recordedAt != null && DateTime.now().difference(file.recordedAt!).inMinutes < 5) {
+                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Видео ещё записывается, попробуйте позже')));
+                              return;
+                            }
                             Navigator.of(context).push(MaterialPageRoute<void>(
                               builder: (_) => VideoPlayerScreen(path: url, title: '${file.name} (Online)'),
                             ));
