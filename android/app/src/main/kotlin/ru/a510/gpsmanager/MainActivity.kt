@@ -4,19 +4,29 @@ import android.content.Context
 import android.net.wifi.WifiManager
 import android.os.StatFs
 import android.net.ConnectivityManager
+import android.net.Network
 import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
-    private var wifiNetwork: android.net.Network? = null
-    private val networkCallback = object : android.net.ConnectivityManager.NetworkCallback() {
-        override fun onAvailable(network: android.net.Network) {
+    private var wifiNetwork: Network? = null
+    
+    private val networkCallback = object : ConnectivityManager.NetworkCallback() {
+        override fun onAvailable(network: Network) {
             wifiNetwork = network
+            // Принудительно пускаем весь трафик приложения через эту Wi-Fi сеть
+            val cm = applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+            cm.bindProcessToNetwork(network)
         }
-        override fun onLost(network: android.net.Network) {
-            if (wifiNetwork == network) wifiNetwork = null
+        override fun onLost(network: Network) {
+            if (wifiNetwork == network) {
+                wifiNetwork = null
+                val cm = applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+                cm.bindProcessToNetwork(null)
+            }
         }
     }
 
@@ -24,18 +34,12 @@ class MainActivity : FlutterActivity() {
     private val storageChannelName = "ru.a510.gpsmanager/storage"
 
     private fun bindToWifi(): Boolean {
-        val cm = applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
-        var wifiNet = wifiNetwork
-        if (wifiNet == null) {
-            for (net in cm.allNetworks) {
-                val caps = cm.getNetworkCapabilities(net)
-                if (caps != null && caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI)) {
-                    wifiNet = net
-                    break
-                }
-            }
+        val cm = applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val net = wifiNetwork
+        if (net != null) {
+            return cm.bindProcessToNetwork(net)
         }
-        return if (wifiNet != null) cm.bindProcessToNetwork(wifiNet) else false
+        return false
     }
 
     private fun unbindWifi() {
@@ -45,11 +49,17 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        val cm = applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
-        val request = android.net.NetworkRequest.Builder()
-            .addTransportType(android.net.NetworkCapabilities.TRANSPORT_WIFI)
+        
+        val cm = applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        
+        // КЛЮЧЕВОЙ МОМЕНТ: Запрашиваем Wi-Fi сеть, у которой НЕТ интернета (removeCapability)
+        val request = NetworkRequest.Builder()
+            .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+            .removeCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
             .build()
+            
         cm.registerNetworkCallback(request, networkCallback)
+
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, channelName)
             .setMethodCallHandler { call, result ->
                 if (call.method == "bindToWifi") {
@@ -81,6 +91,7 @@ class MainActivity : FlutterActivity() {
                     result.notImplemented()
                 }
             }
+            
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, storageChannelName)
             .setMethodCallHandler { call, result ->
                 if (call.method == "getFreeBytes") {
