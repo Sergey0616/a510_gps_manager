@@ -390,7 +390,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     }
     }
 
-    if (nearest == null || minDistance > 150) {
+    if (nearest == null || minDistance > 300) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Рядом нет точек трека (ближе 150 м)')));
       return;
     }

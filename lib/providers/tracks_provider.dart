@@ -205,7 +205,11 @@ class TracksProvider extends ChangeNotifier {
     final uniquePoints = <String, GpsPoint>{};
     for (final p in mergedList) {
       final key = '${p.timestamp}_${p.latitude}_${p.longitude}';
-      uniquePoints[key] = p;
+      final existing = uniquePoints[key];
+      // Если старая точка без видео, а новая с видео — заменяем!
+      if (existing == null || (existing.videoName == null && p.videoName != null)) {
+        uniquePoints[key] = p;
+      }
     }
     
     final dates = uniquePoints.values.map((p) => p.timeUtc.toString().substring(0, 10)).toSet();
